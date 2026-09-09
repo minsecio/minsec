@@ -6,7 +6,6 @@
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-pub const DEFAULT_CONFIG: &str = "/etc/minsec/sync.toml";
 pub const DEFAULT_SERVER: &str = "https://api.minsec.io";
 pub const DEFAULT_STATE_DIR: &str = "/var/lib/minsec/sync";
 pub const DEFAULT_EVENTS: &str = "/var/lib/minsec/events.jsonl";
