@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
-# Install previously generated completions; never run Cargo as root.
+# Install the shell completions from completions/ for a source build.
 set -euo pipefail
 
 usage() {
-    echo "usage: $0 [--user|--system] [--shell bash|zsh|fish|all] [--from DIRECTORY]"
-    echo "Defaults: --user --shell all --from REPO/target/completions"
+    echo "usage: $0 [--user|--system] [--shell bash|zsh|fish|all]"
+    echo "Defaults: --user --shell all"
     echo "System installs: PREFIX=/usr/local, DESTDIR=; override shell directories with"
     echo "BASH_COMPLETION_DIR, ZSH_COMPLETION_DIR, or FISH_COMPLETION_DIR."
 }
 die() { echo "$*" >&2; exit 2; }
 repo=$(cd -- "$(dirname -- "$0")/.." && pwd)
-source_dir="$repo/target/completions"
+source_dir="$repo/completions"
 mode=user
 shell=all
 while (( $# )); do
     case "$1" in
         --user) mode=user; shift ;;
         --system) mode=system; shift ;;
-        --shell|--from)
+        --shell)
             (( $# >= 2 )) || die "missing value for $1"
-            if [[ $1 == --shell ]]; then shell=$2; else source_dir=$2; fi
+            shell=$2
             shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; die "unknown argument: $1" ;;
@@ -58,8 +58,7 @@ for selected in "${shells[@]}"; do
             fish) filename="$command.fish"; directory=$fish_dir ;;
         esac
         [[ $directory == /* ]] || die "completion directories must be absolute: $directory"
-        [[ -s "$source_dir/$selected/$filename" ]] ||
-            die "missing $source_dir/$selected/$filename; run scripts/generate-completions.sh first"
+        [[ -s "$source_dir/$selected/$filename" ]] || die "missing $source_dir/$selected/$filename"
     done
 done
 for selected in "${shells[@]}"; do

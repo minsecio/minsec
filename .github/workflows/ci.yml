@@ -18,8 +18,7 @@ jobs:
       - name: Shell completions
         run: |
           sudo apt-get install -y bash-completion zsh fish shellcheck
-          scripts/generate-completions.sh
-          shellcheck scripts/generate-completions.sh scripts/install-completions.sh tests/completions.sh
+          shellcheck scripts/install-completions.sh tests/completions.sh completions/bash/*
           tests/completions.sh
       - run: cargo build --release
       - name: binary size gate

@@ -1,0 +1,47 @@
+#compdef minsec-sync
+
+# Zsh completion for minsec-sync. All values are static.
+
+_minsec-sync_commands() {
+    local -a commands=(
+        'enroll:Generate a key (first run) and enroll with the server'
+        'report:Submit new automatic bans from the events log'
+        'pull:Fetch the crowd blocklist into the crowd4/crowd6 nftables sets'
+        'run:Report then pull; enrolls first if needed'
+        'status:Show enrollment, cursor, and feed state'
+        'help:Print help for a subcommand'
+    )
+    _describe -t commands 'minsec-sync command' commands
+}
+
+_minsec-sync() {
+    local curcontext=$curcontext state line ret=1
+    typeset -A opt_args
+    local -a global_opts=(
+        '(-c --config)'{-c,--config}'[Configuration file]:file:_files'
+        '--dry-run[Print nft scripts instead of applying them]'
+        '(- : *)'{-h,--help}'[Print help]'
+    )
+
+    _arguments -C $global_opts \
+        '(- : *)'{-V,--version}'[Print version]' \
+        '1: :_minsec-sync_commands' \
+        '*::: :->args' && ret=0
+
+    case $state in
+        args)
+            # $words now holds only the words after the subcommand; put the
+            # subcommand back so the nested _arguments sees a full command line.
+            words=($line[1] "${words[@]}")
+            ((CURRENT++))
+            curcontext=${curcontext%:*:*}:minsec-sync-$line[1]:
+            case $line[1] in
+                help) _arguments '1: :_minsec-sync_commands' && ret=0 ;;
+                *) _arguments $global_opts && ret=0 ;;
+            esac
+            ;;
+    esac
+    return ret
+}
+
+_minsec-sync "$@"

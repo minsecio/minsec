@@ -57,7 +57,6 @@ jobs:
           scripts/check-glibc.sh target/release/minsec-sync ${{ env.GLIBC_FLOOR }}
       - name: Package
         run: |
-          scripts/generate-completions.sh
           cargo deb -p minsec --no-build --no-strip --target ${{ matrix.target }}
           cargo generate-rpm -p crates/minsec --target ${{ matrix.target }}
           mkdir -p dist

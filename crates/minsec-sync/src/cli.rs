@@ -1,4 +1,4 @@
-//! Command definitions shared by the binary and its completion generator.
+//! Command definitions. Keep completions/ in sync when changing these.
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
