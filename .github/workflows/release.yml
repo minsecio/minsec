@@ -57,6 +57,7 @@ jobs:
           scripts/check-glibc.sh target/release/minsec-sync ${{ env.GLIBC_FLOOR }}
       - name: Package
         run: |
+          scripts/generate-completions.sh
           cargo deb -p minsec --no-build --no-strip --target ${{ matrix.target }}
           cargo generate-rpm -p crates/minsec --target ${{ matrix.target }}
           mkdir -p dist
@@ -100,6 +101,27 @@ jobs:
           fi
           minsec --version
           minsec-sync --version
+          for command in minsec minsec-sync; do
+            test -s /usr/share/bash-completion/completions/$command.bash
+            test -s /usr/share/fish/vendor_completions.d/$command.fish
+            if command -v dnf >/dev/null; then
+              test -s /usr/share/zsh/site-functions/_$command
+            else
+              test -s /usr/share/zsh/vendor-completions/_$command
+            fi
+          done
+          bash -c '
+            source /usr/share/bash-completion/completions/minsec.bash
+            source /usr/share/bash-completion/completions/minsec-sync.bash
+            COMP_WORDS=(minsec che); COMP_CWORD=1; _minsec minsec che minsec
+            [[ " ${COMPREPLY[*]} " == *" check "* ]] || exit 1
+            COMP_WORDS=(minsec ban --t); COMP_CWORD=2; _minsec minsec --t ban
+            [[ " ${COMPREPLY[*]} " == *" --ttl "* ]] || exit 1
+            COMP_WORDS=(minsec-sync pu); COMP_CWORD=1; _minsec-sync minsec-sync pu minsec-sync
+            [[ " ${COMPREPLY[*]} " == *" pull "* ]] || exit 1
+            COMP_WORDS=(minsec-sync pull --d); COMP_CWORD=2; _minsec-sync minsec-sync --d pull
+            [[ " ${COMPREPLY[*]} " == *" --dry-run "* ]] || exit 1
+          '
           minsec-sync run   # multiplayer not configured: must exit 0 quietly
           minsec check
           minsec filters

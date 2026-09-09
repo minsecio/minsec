@@ -1,6 +1,7 @@
 //! `minsec-sync`: the multiplayer client. Short-lived, timer-driven; the
 //! resident daemon has no network stack. See docs/MULTIPLAYER.md.
 
+mod cli;
 mod client;
 mod config;
 mod events;
@@ -11,44 +12,12 @@ mod state;
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
-use clap::{Parser, Subcommand};
+use clap::Parser;
+use cli::{Cli, Cmd};
 use client::Api;
 use config::Config;
 use minsec_proto::types::{EnrollRequest, POW_ALGO};
 use state::Store;
-use std::path::PathBuf;
-
-#[derive(Parser)]
-#[command(
-    name = "minsec-sync",
-    version,
-    about = "minsec multiplayer client: report automatic bans, pull the crowd blocklist"
-)]
-struct Cli {
-    /// Configuration file.
-    #[arg(short = 'c', long, default_value = config::DEFAULT_CONFIG, global = true)]
-    config: PathBuf,
-    /// Print nft scripts instead of applying them.
-    #[arg(long, global = true)]
-    dry_run: bool,
-    #[command(subcommand)]
-    cmd: Cmd,
-}
-
-#[derive(Subcommand)]
-enum Cmd {
-    /// Generate a key (first run) and enroll with the server.
-    Enroll,
-    /// Submit new automatic bans from the events log.
-    Report,
-    /// Fetch the crowd blocklist into the crowd4/crowd6 nftables sets.
-    Pull,
-    /// Report then pull; enrolls first if needed. Intended for the systemd
-    /// timer — exits 0 quietly when multiplayer is not configured.
-    Run,
-    /// Show enrollment, cursor, and feed state.
-    Status,
-}
 
 fn main() {
     let cli = Cli::parse();

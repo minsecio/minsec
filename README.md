@@ -127,6 +127,41 @@ for anything else; ipset and pf backends are on the roadmap.
 
 ## Packages
 
+### Shell completions
+
+The deb and RPM packages include static Bash, Zsh, and Fish completions for
+both `minsec` and `minsec-sync`. They complete subcommands and options;
+filter names and active bans are not queried. Bash needs the optional
+`bash-completion` package enabled, and Zsh needs `compinit` enabled.
+
+For source installs, generate the files as your normal user, then install:
+
+```sh
+scripts/generate-completions.sh
+scripts/install-completions.sh --user                  # all three shells
+scripts/install-completions.sh --user --shell bash     # just Bash
+# Or install for all users alongside the /usr/bin binaries above:
+sudo env PREFIX=/usr scripts/install-completions.sh --system
+```
+
+The installer prints activation instructions and does not edit shell startup
+files. User installs respect `XDG_DATA_HOME` (Bash/Zsh) and `XDG_CONFIG_HOME`
+(Fish). For Zsh, add the printed directory to `fpath` before `compinit`.
+System installs default to `PREFIX=/usr/local`; older shell setups may not
+search this prefix automatically, so use `PREFIX=/usr` or configure the
+shell's search path. `DESTDIR` stages system installs without touching the
+running system. `BASH_COMPLETION_DIR`, `ZSH_COMPLETION_DIR`, and
+`FISH_COMPLETION_DIR` override destination directories (absolute paths).
+Use `--from DIRECTORY` to install files generated in another directory.
+
+Completions are generated from the same Clap definitions as the binaries,
+using Cargo examples on the build host even when cross-compiling. The
+`clap_complete` dependency is development-only and is not linked into either
+shipped binary. Generated files live under `target/completions`; regenerate
+them before packaging after changing the CLI.
+
+### Building packages
+
 Tagging `v*` runs `.github/workflows/release.yml`, which builds x86_64 and
 aarch64 binaries against glibc 2.28 (`cargo-zigbuild`), packages them with
 `cargo-deb` and `cargo-generate-rpm`, installs them in EL8/9/10, Debian 11/12
@@ -138,8 +173,10 @@ To build packages locally:
 
 ```sh
 cargo install cargo-zigbuild cargo-deb cargo-generate-rpm && pip install ziglang
-cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.28 -p minsec
-mkdir -p target/release && cp target/x86_64-unknown-linux-gnu/release/minsec target/release/
+cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.28 -p minsec -p minsec-sync
+mkdir -p target/release
+cp target/x86_64-unknown-linux-gnu/release/minsec target/x86_64-unknown-linux-gnu/release/minsec-sync target/release/
+scripts/generate-completions.sh
 cargo deb -p minsec --no-build --no-strip --target x86_64-unknown-linux-gnu
 cargo generate-rpm -p crates/minsec --target x86_64-unknown-linux-gnu
 ```
