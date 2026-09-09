@@ -102,7 +102,7 @@ jobs:
           minsec --version
           minsec-sync --version
           for command in minsec minsec-sync; do
-            test -s /usr/share/bash-completion/completions/$command.bash
+            test -s /usr/share/bash-completion/completions/$command
             test -s /usr/share/fish/vendor_completions.d/$command.fish
             if command -v dnf >/dev/null; then
               test -s /usr/share/zsh/site-functions/_$command
@@ -111,8 +111,8 @@ jobs:
             fi
           done
           bash -c '
-            source /usr/share/bash-completion/completions/minsec.bash
-            source /usr/share/bash-completion/completions/minsec-sync.bash
+            source /usr/share/bash-completion/completions/minsec
+            source /usr/share/bash-completion/completions/minsec-sync
             COMP_WORDS=(minsec che); COMP_CWORD=1; _minsec minsec che minsec
             [[ " ${COMPREPLY[*]} " == *" check "* ]] || exit 1
             COMP_WORDS=(minsec ban --t); COMP_CWORD=2; _minsec minsec --t ban

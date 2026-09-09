@@ -53,7 +53,7 @@ shells=("$shell")
 for selected in "${shells[@]}"; do
     for command in minsec minsec-sync; do
         case "$selected" in
-            bash) filename="$command.bash"; directory=$bash_dir ;;
+            bash) filename=$command; directory=$bash_dir ;;
             zsh) filename="_$command"; directory=$zsh_dir ;;
             fish) filename="$command.fish"; directory=$fish_dir ;;
         esac
@@ -64,7 +64,7 @@ for selected in "${shells[@]}"; do
 done
 for selected in "${shells[@]}"; do
     case "$selected" in
-        bash) directory=$bash_dir; files=(minsec.bash minsec-sync.bash) ;;
+        bash) directory=$bash_dir; files=(minsec minsec-sync) ;;
         zsh) directory=$zsh_dir; files=(_minsec _minsec-sync) ;;
         fish) directory=$fish_dir; files=(minsec.fish minsec-sync.fish) ;;
     esac
@@ -77,8 +77,8 @@ done
 if [[ -z $stage ]]; then
     if [[ $shell == all || $shell == bash ]]; then
         echo "Bash: enable bash-completion, then start a new shell."
-        echo "For this shell (also works with older loaders and paths containing spaces):"
-        printf '  source %q\n  source %q\n' "$bash_dir/minsec.bash" "$bash_dir/minsec-sync.bash"
+        echo "For this shell (also works with paths containing spaces):"
+        printf '  source %q\n  source %q\n' "$bash_dir/minsec" "$bash_dir/minsec-sync"
     fi
     if [[ $shell == all || $shell == zsh ]]; then
         printf 'Zsh: ensure %q is on fpath before running compinit.\n' "$zsh_dir"

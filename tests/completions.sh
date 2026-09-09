@@ -9,7 +9,7 @@ export XDG_DATA_HOME="$temp/user data" XDG_CONFIG_HOME="$temp/user config"
 unset BASH_COMPLETION_DIR ZSH_COMPLETION_DIR FISH_COMPLETION_DIR BASH_COMPLETION_USER_DIR DESTDIR PREFIX
 "$repo/scripts/install-completions.sh" --user
 for command in minsec minsec-sync; do
-    cmp "$generated/bash/$command.bash" "$XDG_DATA_HOME/bash-completion/completions/$command.bash"
+    cmp "$generated/bash/$command" "$XDG_DATA_HOME/bash-completion/completions/$command"
     cmp "$generated/zsh/_$command" "$XDG_DATA_HOME/zsh/site-functions/_$command"
     cmp "$generated/fish/$command.fish" "$XDG_CONFIG_HOME/fish/completions/$command.fish"
 done
@@ -18,13 +18,13 @@ for layout in vendor-completions site-functions; do
     DESTDIR="$temp/$layout" PREFIX=/usr ZSH_COMPLETION_DIR="/usr/share/zsh/$layout" \
         "$repo/scripts/install-completions.sh" --system
     for command in minsec minsec-sync; do
-        for relative in "bash-completion/completions/$command.bash" "zsh/$layout/_$command" "fish/vendor_completions.d/$command.fish"; do
+        for relative in "bash-completion/completions/$command" "zsh/$layout/_$command" "fish/vendor_completions.d/$command.fish"; do
             test "$(stat -c %a "$temp/$layout/usr/share/$relative")" = 644
         done
     done
 done
 DESTDIR="$temp/only-bash" "$repo/scripts/install-completions.sh" --system --shell bash
-test -f "$temp/only-bash/usr/local/share/bash-completion/completions/minsec.bash"
+test -f "$temp/only-bash/usr/local/share/bash-completion/completions/minsec"
 test ! -e "$temp/only-bash/usr/local/share/zsh"
 if DESTDIR="$temp/missing" "$repo/scripts/install-completions.sh" --system --from "$temp/absent"; then
     echo "installer accepted missing completion files" >&2; exit 1
@@ -34,7 +34,7 @@ if "$repo/scripts/install-completions.sh" --shell unknown; then
     echo "installer accepted an unknown shell" >&2; exit 1
 fi
 
-# Exercise Bash's lazy loader with the installed .bash filenames.
+# Exercise Bash's lazy loader with the installed filenames.
 # bash-completion 2.11 splits user directories on spaces; the installer checks
 # above still cover such paths, while lazy loading uses a space-free directory.
 export BASH_COMPLETION_USER_DIR="$temp/bash-completion"
@@ -49,9 +49,9 @@ if [[ -f /usr/share/bash-completion/bash_completion ]]; then
     _completion_loader minsec-sync || [[ $? == 124 ]]
 else
     # shellcheck disable=SC1091
-    source "$XDG_DATA_HOME/bash-completion/completions/minsec.bash"
+    source "$XDG_DATA_HOME/bash-completion/completions/minsec"
     # shellcheck disable=SC1091
-    source "$XDG_DATA_HOME/bash-completion/completions/minsec-sync.bash"
+    source "$XDG_DATA_HOME/bash-completion/completions/minsec-sync"
 fi
 expect_bash() {
     local expected=$1 function=$2
@@ -71,7 +71,7 @@ expect_bash pull _minsec-sync minsec-sync pu
 expect_bash --dry-run _minsec-sync minsec-sync pull --d
 
 for command in minsec minsec-sync; do
-    bash -n "$generated/bash/$command.bash"
+    bash -n "$generated/bash/$command"
     zsh -n "$generated/zsh/_$command"
     fish -n "$generated/fish/$command.fish"
 done

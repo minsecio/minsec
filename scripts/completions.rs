@@ -17,7 +17,7 @@ pub fn generate<C: CommandFactory>() -> io::Result<()> {
     let mut command = C::command();
     let name = command.get_name().to_owned();
     for (shell, subdir, filename) in [
-        (Shell::Bash, "bash", format!("{name}.bash")),
+        (Shell::Bash, "bash", name.clone()),
         (Shell::Zsh, "zsh", format!("_{name}")),
         (Shell::Fish, "fish", format!("{name}.fish")),
     ] {
