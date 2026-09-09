@@ -4,6 +4,7 @@
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "cmd", rename_all = "kebab-case")]
@@ -93,11 +94,21 @@ impl Response {
     }
 }
 
+/// How long the CLI waits for the daemon before giving up. Shell completions
+/// call the daemon on every tab press, so a wedged daemon must not hang them.
+pub const TIMEOUT: Duration = Duration::from_secs(5);
+
 /// Blocking client used by the CLI.
 pub fn call(socket: &Path, req: &Request) -> anyhow::Result<Response> {
+    call_with_timeout(socket, req, TIMEOUT)
+}
+
+pub fn call_with_timeout(socket: &Path, req: &Request, timeout: Duration) -> anyhow::Result<Response> {
     use std::io::{BufRead, BufReader, Write};
     let mut s = std::os::unix::net::UnixStream::connect(socket)
         .map_err(|e| anyhow::anyhow!("cannot connect to {} ({e}); is minsec running?", socket.display()))?;
+    s.set_read_timeout(Some(timeout))?;
+    s.set_write_timeout(Some(timeout))?;
     let mut line = serde_json::to_string(req)?;
     line.push('\n');
     s.write_all(line.as_bytes())?;
@@ -119,5 +130,24 @@ mod tests {
         assert!(matches!(r, Request::Ban { ttl: Some(60), .. }));
         let s = serde_json::to_string(&Response::err("nope")).unwrap();
         assert_eq!(s, r#"{"ok":false,"error":"nope"}"#);
+    }
+
+    #[test]
+    fn call_times_out_on_silent_daemon() {
+        let dir = std::env::temp_dir().join(format!("minsec-control-{}", std::process::id()));
+        std::fs::remove_dir_all(&dir).ok();
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("ctl.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        // Accept the connection, then hold it open without answering.
+        let silent = std::thread::spawn(move || listener.accept().map(|(s, _)| s));
+        let err = call_with_timeout(&path, &Request::List, Duration::from_millis(100)).unwrap_err();
+        let io = err.downcast_ref::<std::io::Error>().expect("io error");
+        assert!(
+            matches!(io.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut),
+            "{io}"
+        );
+        drop(silent.join().unwrap().unwrap());
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

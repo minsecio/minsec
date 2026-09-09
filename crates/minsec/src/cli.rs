@@ -1,4 +1,4 @@
-//! Command definitions shared by the binary and its completion generator.
+//! Command definitions. Keep completions/ in sync when changing these.
 
 use clap::{Parser, Subcommand};
 use minsec_core::config::DEFAULT_CONFIG_DIR;
@@ -26,7 +26,7 @@ pub(crate) enum Cmd {
     /// Run the daemon in the foreground.
     Daemon {
         /// Override the backend (e.g. `null` to observe without banning).
-        #[arg(long)]
+        #[arg(long, value_parser = ["nft", "null", "exec"])]
         backend: Option<String>,
         /// Read existing log files from the beginning instead of the end.
         #[arg(long)]

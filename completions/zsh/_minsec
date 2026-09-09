@@ -1,0 +1,133 @@
+#compdef minsec
+
+# Zsh completion for minsec.
+#
+# Subcommands and options are static; filter names come from `minsec filters`
+# and active bans from `minsec list` at completion time. Data queries fail
+# silently, e.g. when the daemon is not running or the socket is not readable.
+
+# Config dir arguments for data queries, from -c/--config-dir on the line.
+# minsec_cmd and minsec_global_args are set by _minsec; opt_args holds the
+# options parsed after the subcommand.
+_minsec_config_args() {
+    local dir
+    for dir in $opt_args[--config-dir] $opt_args[-c] \
+        $minsec_global_args[--config-dir] $minsec_global_args[-c]; do
+        print -r -- --config-dir ${(Q)dir}
+        return
+    done
+}
+
+# Filter names with descriptions. The last argument selects all, enabled, or
+# disabled filters; the rest are compadd options from _arguments.
+_minsec_filters() {
+    local line want=$argv[-1]
+    local -a filters
+    for line in ${(f)"$(_call_program filters $minsec_cmd $(_minsec_config_args) filters 2>/dev/null |
+            awk -v want="$want" '
+                $1 == "*" { if (want == "disabled") next; n = $2; s = 3 }
+                $1 != "*" { if (want == "enabled") next; n = $1; s = 2 }
+                { d = ""; for (i = s; i <= NF; i++) d = d (i > s ? " " : "") $i; print n "\t" d }')"}; do
+        filters+=("${line%%$'\t'*}:${${line#*$'\t'}//:/\\:}")
+    done
+    _describe -t filters 'filter' filters "${(@)argv[1,-2]}"
+}
+
+# Active bans as nft-style addresses and networks.
+_minsec_bans() {
+    local -a bans
+    bans=(${(f)"$(_call_program bans $minsec_cmd $(_minsec_config_args) list 2>/dev/null | awk '{ print $1 }')"})
+    _wanted bans expl 'active ban' compadd "$@" -a bans
+}
+
+_minsec_commands() {
+    local -a commands=(
+        'daemon:Run the daemon in the foreground'
+        'check:Validate configuration and compile filters'
+        'inspect:Inspect merged configuration, files, filters, and effective policy'
+        'test:Run a filter over a log file (or stdin) and show what would match'
+        'status:Daemon status'
+        'list:List active bans'
+        'ban:Ban an address or network'
+        'unban:Remove a ban'
+        'filters:List built-in and custom filters'
+        'enable:Enable a filter'
+        'disable:Disable a filter'
+        'events:Print the event log'
+        'help:Print help for a subcommand'
+    )
+    _describe -t commands 'minsec command' commands
+}
+
+_minsec() {
+    local curcontext=$curcontext state line ret=1
+    # _arguments rewrites $words for subcommands, so keep the command itself.
+    local minsec_cmd=$words[1]
+    typeset -A opt_args
+    local -a global_opts=(
+        '(-c --config-dir)'{-c,--config-dir}'[Configuration directory]:directory:_files -/'
+        '--json[Machine-readable JSON output]'
+        '(- : *)'{-h,--help}'[Print help]'
+    )
+
+    _arguments -C $global_opts \
+        '(- : *)'{-V,--version}'[Print version]' \
+        '1: :_minsec_commands' \
+        '*::: :->args' && ret=0
+
+    case $state in
+        args)
+            # $words now holds only the words after the subcommand; put the
+            # subcommand back so the nested _arguments sees a full command line.
+            words=($line[1] "${words[@]}")
+            ((CURRENT++))
+            # The nested _arguments below replaces opt_args; keep the globals.
+            local -A minsec_global_args=("${(@kv)opt_args}")
+            curcontext=${curcontext%:*:*}:minsec-$line[1]:
+            case $line[1] in
+                daemon)
+                    _arguments $global_opts \
+                        '--backend[Override the backend]:backend:(nft null exec)' \
+                        '--replay[Read existing log files from the beginning instead of the end]' && ret=0
+                    ;;
+                check)
+                    _arguments $global_opts \
+                        '--all[Compile every discovered filter, including disabled custom filters]' && ret=0
+                    ;;
+                test)
+                    _arguments $global_opts \
+                        '(-q --quiet)'{-q,--quiet}'[Only print a summary]' \
+                        '1:filter:_minsec_filters all' \
+                        '2:log file:_files' && ret=0
+                    ;;
+                ban)
+                    _arguments $global_opts \
+                        '--ttl[Ban duration, e.g. 1h or 2d]:duration' \
+                        '1:address or network' && ret=0
+                    ;;
+                unban)
+                    _arguments $global_opts '1:ban:_minsec_bans' && ret=0
+                    ;;
+                enable)
+                    _arguments $global_opts '1:filter:_minsec_filters disabled' && ret=0
+                    ;;
+                disable)
+                    _arguments $global_opts '1:filter:_minsec_filters enabled' && ret=0
+                    ;;
+                events)
+                    _arguments $global_opts \
+                        '(-n --last)'{-n,--last}'[Number of events to print]:count' && ret=0
+                    ;;
+                help)
+                    _arguments '1: :_minsec_commands' && ret=0
+                    ;;
+                *)
+                    _arguments $global_opts && ret=0
+                    ;;
+            esac
+            ;;
+    esac
+    return ret
+}
+
+_minsec "$@"

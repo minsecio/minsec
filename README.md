@@ -129,15 +129,17 @@ for anything else; ipset and pf backends are on the roadmap.
 
 ### Shell completions
 
-The deb and RPM packages include static Bash, Zsh, and Fish completions for
-both `minsec` and `minsec-sync`. They complete subcommands and options;
-filter names and active bans are not queried. Bash needs the optional
+The deb and RPM packages include Bash, Zsh, and Fish completions for both
+`minsec` and `minsec-sync`. Subcommands and options are static; filter names
+for `enable`, `disable`, and `test` come from `minsec filters`, and active bans
+for `unban` come from `minsec list` at completion time. Ban completion needs
+read access to the control socket, so it only works for root or the socket's
+group; every data query fails silently otherwise. Bash needs the optional
 `bash-completion` package enabled, and Zsh needs `compinit` enabled.
 
-For source installs, generate the files as your normal user, then install:
+For source installs, the files are in `completions/`:
 
 ```sh
-scripts/generate-completions.sh
 scripts/install-completions.sh --user                  # all three shells
 scripts/install-completions.sh --user --shell bash     # just Bash
 # Or install for all users alongside the /usr/bin binaries above:
@@ -152,13 +154,10 @@ search this prefix automatically, so use `PREFIX=/usr` or configure the
 shell's search path. `DESTDIR` stages system installs without touching the
 running system. `BASH_COMPLETION_DIR`, `ZSH_COMPLETION_DIR`, and
 `FISH_COMPLETION_DIR` override destination directories (absolute paths).
-Use `--from DIRECTORY` to install files generated in another directory.
 
-Completions are generated from the same Clap definitions as the binaries,
-using Cargo examples on the build host even when cross-compiling. The
-`clap_complete` dependency is development-only and is not linked into either
-shipped binary. Generated files live under `target/completions`; regenerate
-them before packaging after changing the CLI.
+The completions are maintained by hand. When changing a subcommand or option,
+update all three scripts; `tests/completions.sh` checks them against
+`--help` and exercises each shell against a stand-in `minsec`.
 
 ### Building packages
 
@@ -176,7 +175,6 @@ cargo install cargo-zigbuild cargo-deb cargo-generate-rpm && pip install ziglang
 cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.28 -p minsec -p minsec-sync
 mkdir -p target/release
 cp target/x86_64-unknown-linux-gnu/release/minsec target/x86_64-unknown-linux-gnu/release/minsec-sync target/release/
-scripts/generate-completions.sh
 cargo deb -p minsec --no-build --no-strip --target x86_64-unknown-linux-gnu
 cargo generate-rpm -p crates/minsec --target x86_64-unknown-linux-gnu
 ```

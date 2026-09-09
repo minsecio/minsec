@@ -1,0 +1,43 @@
+# shellcheck shell=bash
+# Bash completion for minsec-sync. All values are static.
+
+_minsec_sync() {
+    local cur prev words cword
+    if declare -F _init_completion >/dev/null; then
+        _init_completion -n = || return
+    else
+        words=("${COMP_WORDS[@]}") cword=$COMP_CWORD
+        cur=${words[cword]} prev=${words[cword - 1]}
+    fi
+
+    local subcommands='enroll report pull run status help'
+    local i cmd='' positionals=0
+    for ((i = 1; i < cword; i++)); do
+        case ${words[i]} in
+            -c | --config) ((i++)) ;;
+            -*) ;;
+            *) if [[ -z $cmd ]]; then cmd=${words[i]}; else ((positionals++)); fi ;;
+        esac
+    done
+
+    case $prev in
+        -c | --config)
+            mapfile -t COMPREPLY < <(compgen -f -- "$cur")
+            compopt -o filenames 2>/dev/null
+            return
+            ;;
+    esac
+
+    if [[ $cur == -* ]]; then
+        local opts='-c --config --dry-run -h --help'
+        [[ -n $cmd ]] || opts+=' -V --version'
+        mapfile -t COMPREPLY < <(compgen -W "$opts" -- "$cur")
+        return
+    fi
+
+    if [[ -z $cmd || ($cmd == help && $positionals == 0) ]]; then
+        mapfile -t COMPREPLY < <(compgen -W "$subcommands" -- "$cur")
+    fi
+}
+
+complete -F _minsec_sync minsec-sync

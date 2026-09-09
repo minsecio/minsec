@@ -1,0 +1,135 @@
+# shellcheck shell=bash
+# Bash completion for minsec.
+#
+# Subcommands and options are static; filter names come from `minsec filters`
+# and active bans from `minsec list` at completion time. Data queries fail
+# silently, e.g. when the daemon is not running or the socket is not readable.
+
+# Set config_dir in the caller from any -c/--config-dir on the command line so
+# data queries look at the same configuration the user is about to operate on.
+_minsec_config_dir() {
+    local i
+    config_dir=
+    for ((i = 1; i < cword; i++)); do
+        case ${words[i]} in
+            -c | --config-dir) config_dir=${words[i + 1]-} ;;
+            --config-dir=*) config_dir=${words[i]#--config-dir=} ;;
+        esac
+    done
+}
+
+# Run a minsec data query with the user's config dir.
+_minsec_query() {
+    local config_dir
+    _minsec_config_dir
+    if [[ -n $config_dir ]]; then
+        "$1" --config-dir "$config_dir" "${@:2}" 2>/dev/null
+    else
+        "$@" 2>/dev/null
+    fi
+}
+
+# Filter names: $1 is the minsec command, $2 selects all, enabled, or disabled.
+_minsec_filters() {
+    _minsec_query "$1" filters | awk -v want="$2" '
+        $1 == "*" { if (want != "disabled") print $2; next }
+        { if (want != "enabled") print $1 }'
+}
+
+# Active bans as nft-style addresses and networks.
+_minsec_bans() {
+    _minsec_query "$1" list | awk '{ print $1 }'
+}
+
+_minsec() {
+    local cur prev words cword
+    if declare -F _init_completion >/dev/null; then
+        _init_completion -n := || return
+    else
+        words=("${COMP_WORDS[@]}") cword=$COMP_CWORD
+        cur=${words[cword]} prev=${words[cword - 1]}
+    fi
+
+    local subcommands='daemon check inspect test status list ban unban filters enable disable events help'
+    local global_opts='-c --config-dir --json -h --help'
+
+    # Locate the subcommand and count the positional arguments after it.
+    local i cmd='' positionals=0
+    for ((i = 1; i < cword; i++)); do
+        case ${words[i]} in
+            -c | --config-dir | --backend | --ttl | -n | --last) ((i++)) ;;
+            -*) ;;
+            *) if [[ -z $cmd ]]; then cmd=${words[i]}; else ((positionals++)); fi ;;
+        esac
+    done
+
+    # Values for options that take one.
+    case $prev in
+        -c | --config-dir)
+            mapfile -t COMPREPLY < <(compgen -d -- "$cur")
+            compopt -o filenames 2>/dev/null
+            return
+            ;;
+        --backend)
+            mapfile -t COMPREPLY < <(compgen -W 'nft null exec' -- "$cur")
+            return
+            ;;
+        --ttl | -n | --last) return ;;
+    esac
+
+    if [[ $cur == -* ]]; then
+        local opts=$global_opts
+        case $cmd in
+            '') opts+=' -V --version' ;;
+            daemon) opts+=' --backend --replay' ;;
+            check) opts+=' --all' ;;
+            test) opts+=' -q --quiet' ;;
+            ban) opts+=' --ttl' ;;
+            events) opts+=' -n --last' ;;
+        esac
+        mapfile -t COMPREPLY < <(compgen -W "$opts" -- "$cur")
+        return
+    fi
+
+    if [[ -z $cmd ]]; then
+        mapfile -t COMPREPLY < <(compgen -W "$subcommands" -- "$cur")
+        return
+    fi
+    case $cmd in
+        enable)
+            if ((positionals == 0)); then
+                mapfile -t COMPREPLY < <(compgen -W "$(_minsec_filters "$1" disabled)" -- "$cur")
+            fi
+            ;;
+        disable)
+            if ((positionals == 0)); then
+                mapfile -t COMPREPLY < <(compgen -W "$(_minsec_filters "$1" enabled)" -- "$cur")
+            fi
+            ;;
+        test)
+            case $positionals in
+                0) mapfile -t COMPREPLY < <(compgen -W "$(_minsec_filters "$1" all)" -- "$cur") ;;
+                1)
+                    mapfile -t COMPREPLY < <(compgen -f -- "$cur")
+                    compopt -o filenames 2>/dev/null
+                    ;;
+            esac
+            ;;
+        unban)
+            if ((positionals == 0)); then
+                mapfile -t COMPREPLY < <(compgen -W "$(_minsec_bans "$1")" -- "$cur")
+                # IPv6 addresses contain colons, which Bash treats as word breaks.
+                if declare -F __ltrim_colon_completions >/dev/null; then
+                    __ltrim_colon_completions "$cur"
+                fi
+            fi
+            ;;
+        help)
+            if ((positionals == 0)); then
+                mapfile -t COMPREPLY < <(compgen -W "$subcommands" -- "$cur")
+            fi
+            ;;
+    esac
+}
+
+complete -F _minsec minsec

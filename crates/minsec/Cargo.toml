@@ -22,9 +22,6 @@ tracing-subscriber.workspace = true
 toml.workspace = true
 ipnet.workspace = true
 
-[dev-dependencies]
-clap_complete.workspace = true
-
 # --- Packaging -------------------------------------------------------------
 # Built by `cargo deb` / `cargo generate-rpm` in .github/workflows/release.yml.
 # Binaries are built with cargo-zigbuild against glibc 2.28 so one package per
@@ -49,12 +46,12 @@ suggests = "bash-completion"
 assets = [
   ["target/release/minsec", "usr/bin/", "755"],
   ["target/release/minsec-sync", "usr/bin/", "755"],
-  ["../../target/completions/bash/minsec", "usr/share/bash-completion/completions/minsec", "644"],
-  ["../../target/completions/bash/minsec-sync", "usr/share/bash-completion/completions/minsec-sync", "644"],
-  ["../../target/completions/zsh/_minsec", "usr/share/zsh/vendor-completions/_minsec", "644"],
-  ["../../target/completions/zsh/_minsec-sync", "usr/share/zsh/vendor-completions/_minsec-sync", "644"],
-  ["../../target/completions/fish/minsec.fish", "usr/share/fish/vendor_completions.d/minsec.fish", "644"],
-  ["../../target/completions/fish/minsec-sync.fish", "usr/share/fish/vendor_completions.d/minsec-sync.fish", "644"],
+  ["../../completions/bash/minsec", "usr/share/bash-completion/completions/minsec", "644"],
+  ["../../completions/bash/minsec-sync", "usr/share/bash-completion/completions/minsec-sync", "644"],
+  ["../../completions/zsh/_minsec", "usr/share/zsh/vendor-completions/_minsec", "644"],
+  ["../../completions/zsh/_minsec-sync", "usr/share/zsh/vendor-completions/_minsec-sync", "644"],
+  ["../../completions/fish/minsec.fish", "usr/share/fish/vendor_completions.d/minsec.fish", "644"],
+  ["../../completions/fish/minsec-sync.fish", "usr/share/fish/vendor_completions.d/minsec-sync.fish", "644"],
   ["../../packaging/minsec.toml", "etc/minsec/minsec.toml", "644"],
   ["../../packaging/minsec.service", "lib/systemd/system/minsec.service", "644"],
   ["../../packaging/minsec-sync.service", "lib/systemd/system/minsec-sync.service", "644"],
@@ -85,12 +82,12 @@ post_uninstall_script = "../../packaging/rpm/postun.sh"
 assets = [
   { source = "target/release/minsec", dest = "/usr/bin/minsec", mode = "755" },
   { source = "target/release/minsec-sync", dest = "/usr/bin/minsec-sync", mode = "755" },
-  { source = "target/completions/bash/minsec", dest = "/usr/share/bash-completion/completions/minsec", mode = "644" },
-  { source = "target/completions/bash/minsec-sync", dest = "/usr/share/bash-completion/completions/minsec-sync", mode = "644" },
-  { source = "target/completions/zsh/_minsec", dest = "/usr/share/zsh/site-functions/_minsec", mode = "644" },
-  { source = "target/completions/zsh/_minsec-sync", dest = "/usr/share/zsh/site-functions/_minsec-sync", mode = "644" },
-  { source = "target/completions/fish/minsec.fish", dest = "/usr/share/fish/vendor_completions.d/minsec.fish", mode = "644" },
-  { source = "target/completions/fish/minsec-sync.fish", dest = "/usr/share/fish/vendor_completions.d/minsec-sync.fish", mode = "644" },
+  { source = "completions/bash/minsec", dest = "/usr/share/bash-completion/completions/minsec", mode = "644" },
+  { source = "completions/bash/minsec-sync", dest = "/usr/share/bash-completion/completions/minsec-sync", mode = "644" },
+  { source = "completions/zsh/_minsec", dest = "/usr/share/zsh/site-functions/_minsec", mode = "644" },
+  { source = "completions/zsh/_minsec-sync", dest = "/usr/share/zsh/site-functions/_minsec-sync", mode = "644" },
+  { source = "completions/fish/minsec.fish", dest = "/usr/share/fish/vendor_completions.d/minsec.fish", mode = "644" },
+  { source = "completions/fish/minsec-sync.fish", dest = "/usr/share/fish/vendor_completions.d/minsec-sync.fish", mode = "644" },
   { source = "packaging/minsec.toml", dest = "/etc/minsec/minsec.toml", mode = "644", config = "noreplace" },
   { source = "packaging/minsec.service", dest = "/usr/lib/systemd/system/minsec.service", mode = "644" },
   { source = "packaging/minsec-sync.service", dest = "/usr/lib/systemd/system/minsec-sync.service", mode = "644" },

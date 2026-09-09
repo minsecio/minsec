@@ -27,7 +27,7 @@ fn run() -> anyhow::Result<()> {
                     "nft" => minsec_core::config::BackendKind::Nft,
                     "null" => minsec_core::config::BackendKind::Null,
                     "exec" => minsec_core::config::BackendKind::Exec,
-                    other => anyhow::bail!("unknown backend `{other}`"),
+                    other => unreachable!("clap validates --backend, got `{other}`"),
                 };
             }
             daemon::run(cfg, replay)
