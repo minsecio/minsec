@@ -75,14 +75,17 @@ for command in minsec minsec-sync; do
     zsh -n "$generated/zsh/_$command"
     fish -n "$generated/fish/$command.fish"
 done
-# Zsh must discover both #compdef headers through fpath.
+# Zsh must discover both #compdef headers even if the runner has an insecure
+# fpath entry. Ignore such entries without prompting in this noninteractive test.
+mkdir -m 0777 "$temp/insecure-zsh"
 # shellcheck disable=SC2016
 zsh -f -c '
-    fpath=("$XDG_DATA_HOME/zsh/site-functions" $fpath)
+    fpath=("$XDG_DATA_HOME/zsh/site-functions" "$1" $fpath)
     autoload -Uz compinit
-    compinit -D
+    compinit -i -D || exit 1
+    [[ ${fpath[(Ie)$1]} == 0 ]] || exit 1
     [[ $_comps[minsec] == _minsec && $_comps[minsec-sync] == _minsec-sync ]]
-'
+' zsh "$temp/insecure-zsh"
 # Fish loads the installed files automatically and suggests subcommands/options.
 # Fish requires commands on PATH before autoloading. Inert stand-ins keep this
 # check independent of the binaries' architecture and any daemon configuration.
