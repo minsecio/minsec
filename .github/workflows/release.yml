@@ -146,10 +146,26 @@ jobs:
           files: dist/*
           generate_release_notes: true
       # minsec.io shows the latest release on its install page; tell it to
-      # rebuild now rather than wait for its daily schedule. SITE_DISPATCH_TOKEN
-      # is a fine-grained PAT with Contents: read and write on minsecio/minsec.io
-      # and nothing else.
+      # rebuild now rather than wait for its daily schedule. The run's own
+      # token cannot reach another repository, so a short-lived one is minted
+      # from the org-owned "minsec release" GitHub App, which is installed on
+      # minsecio/minsec.io alone with Contents: write (what repository_dispatch
+      # requires). Secrets on this repo: SITE_APP_ID, SITE_APP_PRIVATE_KEY.
+      # The site rebuilds daily anyway, so a failure here must not fail the
+      # release.
+      - name: Mint minsec.io token
+        id: site-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.SITE_APP_ID }}
+          private-key: ${{ secrets.SITE_APP_PRIVATE_KEY }}
+          owner: minsecio
+          repositories: minsec.io
+          permission-contents: write
       - name: Rebuild minsec.io
+        if: steps.site-token.outcome == 'success'
+        continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ steps.site-token.outputs.token }}
         run: gh api repos/minsecio/minsec.io/dispatches -f event_type=agent-release
