@@ -150,7 +150,8 @@ jobs:
       # token cannot reach another repository, so a short-lived one is minted
       # from the org-owned "minsec release" GitHub App, which is installed on
       # minsecio/minsec.io alone with Contents: write (what repository_dispatch
-      # requires). Secrets on this repo: SITE_APP_ID, SITE_APP_PRIVATE_KEY.
+      # requires). The client ID is public; the key is the SITE_APP_PRIVATE_KEY
+      # secret on this repo.
       # The site rebuilds daily anyway, so a failure here must not fail the
       # release.
       - name: Mint minsec.io token
@@ -158,7 +159,7 @@ jobs:
         continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ secrets.SITE_APP_ID }}
+          client-id: Iv23liAhhXpxixpVZEvd
           private-key: ${{ secrets.SITE_APP_PRIVATE_KEY }}
           owner: minsecio
           repositories: minsec.io
