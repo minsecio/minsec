@@ -5,6 +5,11 @@
 //! `input`/`forward` at priority -10 so drops happen before firewalld's or
 //! iptables-nft's filter chains (priority 0) without touching either.
 //!
+//! The table outlives the daemon, so a set created by an earlier version may
+//! carry a definition this version no longer uses. `add set` on such a set
+//! fails with EEXIST; `setup` then rebuilds just that set, carrying its
+//! elements (and their remaining timeouts) across.
+//!
 //! MVP drives the `nft` binary with a script on stdin; a native netlink
 //! implementation can replace `run()` later behind the same trait.
 
@@ -19,6 +24,8 @@ pub const TABLE: &str = "inet minsec";
 /// How long a crowd-blocklist element survives in the kernel without being
 /// refreshed by a pull. See the crowd sets in `setup_script`.
 pub const CROWD_TIMEOUT: &str = "24h";
+
+const HOOKS: [&str; 2] = ["input", "forward"];
 
 pub struct Nft {
     nft: String,
@@ -61,45 +68,58 @@ impl Nft {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     }
 
-    pub fn setup_script() -> String {
-        let mut s = String::new();
-        s.push_str(&format!("add table {TABLE}\n"));
-        s.push_str(&format!(
-            "add set {TABLE} ban4 {{ type ipv4_addr; flags interval, timeout; }}\n"
-        ));
-        s.push_str(&format!(
-            "add set {TABLE} ban6 {{ type ipv6_addr; flags interval, timeout; }}\n"
-        ));
-        s.push_str(&format!(
-            "add set {TABLE} allow4 {{ type ipv4_addr; flags interval; }}\n"
-        ));
-        s.push_str(&format!(
-            "add set {TABLE} allow6 {{ type ipv6_addr; flags interval; }}\n"
-        ));
+    /// Every set the daemon owns, with its definition body.
+    fn set_defs() -> [(&'static str, String); 6] {
         // Crowd blocklist sets are populated by minsec-sync (multiplayer
         // mode); empty and free until the user opts in. The daemon owns the
         // sets and rules so that flushing its chains on startup cannot strip
         // crowd filtering.
         //
-        // The element timeout is a dead-man's switch. Crowd entries expire
-        // server-side and normally leave as removals in the next delta, so
-        // nothing in the feed protocol bounds how long an entry lives here.
-        // If minsec-sync stops running the kernel must still let the list
-        // decay rather than enforce a frozen blocklist forever; minsec-sync
-        // refreshes the timeout well inside the window. This definition and
-        // minsec-sync's must agree exactly, because whichever process runs
-        // first creates the sets.
-        s.push_str(&format!(
-            "add set {TABLE} crowd4 {{ type ipv4_addr; flags interval, timeout; timeout {CROWD_TIMEOUT}; }}\n"
-        ));
-        s.push_str(&format!(
-            "add set {TABLE} crowd6 {{ type ipv6_addr; flags interval, timeout; timeout {CROWD_TIMEOUT}; }}\n"
-        ));
-        for hook in ["input", "forward"] {
+        // The crowd element timeout is a dead-man's switch. Crowd entries
+        // expire server-side and normally leave as removals in the next
+        // delta, so nothing in the feed protocol bounds how long an entry
+        // lives here. If minsec-sync stops running the kernel must still let
+        // the list decay rather than enforce a frozen blocklist forever;
+        // minsec-sync refreshes the timeout well inside the window. This
+        // definition and minsec-sync's must agree: whichever process runs
+        // first creates the sets, and on a mismatch the daemon rebuilds the
+        // set at every start.
+        [
+            ("ban4", "{ type ipv4_addr; flags interval, timeout; }".into()),
+            ("ban6", "{ type ipv6_addr; flags interval, timeout; }".into()),
+            ("allow4", "{ type ipv4_addr; flags interval; }".into()),
+            ("allow6", "{ type ipv6_addr; flags interval; }".into()),
+            (
+                "crowd4",
+                format!("{{ type ipv4_addr; flags interval, timeout; timeout {CROWD_TIMEOUT}; }}"),
+            ),
+            (
+                "crowd6",
+                format!("{{ type ipv6_addr; flags interval, timeout; timeout {CROWD_TIMEOUT}; }}"),
+            ),
+        ]
+    }
+
+    /// Create-or-keep both chains and empty them. Rules referencing a set
+    /// must be gone before the set can be deleted, and `flush chain` on a
+    /// missing chain is an error, hence the `add chain` first.
+    fn reset_chains(s: &mut String) {
+        for hook in HOOKS {
             s.push_str(&format!(
                 "add chain {TABLE} {hook} {{ type filter hook {hook} priority -10; policy accept; }}\n"
             ));
             s.push_str(&format!("flush chain {TABLE} {hook}\n"));
+        }
+    }
+
+    pub fn setup_script() -> String {
+        let mut s = String::new();
+        s.push_str(&format!("add table {TABLE}\n"));
+        for (name, def) in Self::set_defs() {
+            s.push_str(&format!("add set {TABLE} {name} {def}\n"));
+        }
+        Self::reset_chains(&mut s);
+        for hook in HOOKS {
             s.push_str(&format!("add rule {TABLE} {hook} ip saddr @allow4 accept\n"));
             s.push_str(&format!("add rule {TABLE} {hook} ip6 saddr @allow6 accept\n"));
             s.push_str(&format!("add rule {TABLE} {hook} ip saddr @ban4 counter drop\n"));
@@ -108,6 +128,49 @@ impl Nft {
             s.push_str(&format!("add rule {TABLE} {hook} ip6 saddr @crowd6 counter drop\n"));
         }
         s
+    }
+
+    /// One transaction that replaces `name` with definition `def` and puts
+    /// `entries` back. Elements with a known remaining lifetime keep it;
+    /// the rest take the set's default (or none). The chains are emptied
+    /// first because their rules pin the set; `setup_script` refills them.
+    fn recreate_script(name: &str, def: &str, entries: &[Entry]) -> String {
+        let mut s = String::new();
+        Self::reset_chains(&mut s);
+        s.push_str(&format!("delete set {TABLE} {name}\n"));
+        s.push_str(&format!("add set {TABLE} {name} {def}\n"));
+        let elems: Vec<String> = entries
+            .iter()
+            .map(|e| match e.expires_in {
+                Some(d) => format!("{} timeout {}s", crate::ip::key_to_nft(&e.net), d.as_secs().max(1)),
+                None => crate::ip::key_to_nft(&e.net),
+            })
+            .collect();
+        if !elems.is_empty() {
+            s.push_str(&format!("add element {TABLE} {name} {{ {} }}\n", elems.join(", ")));
+        }
+        s
+    }
+
+    /// Find sets that exist with a definition other than ours and rebuild
+    /// each one with its contents preserved. Returns the names rebuilt.
+    fn recreate_stale_sets(&self) -> anyhow::Result<Vec<&'static str>> {
+        let mut rebuilt = Vec::new();
+        for (name, def) in Self::set_defs() {
+            // `add set` succeeds when the set is absent or identical and
+            // fails with EEXIST when it exists with another definition.
+            if self
+                .run(&format!("add table {TABLE}\nadd set {TABLE} {name} {def}\n"))
+                .is_ok()
+            {
+                continue;
+            }
+            let entries = self.list_set(name)?;
+            self.run(&Self::recreate_script(name, &def, &entries))?;
+            tracing::warn!(target: "minsec::nft", set = name, elements = entries.len(), "rebuilt set with stale definition");
+            rebuilt.push(name);
+        }
+        Ok(rebuilt)
     }
 
     fn set_for(net: &IpNet, prefix: &str) -> &'static str {
@@ -193,6 +256,12 @@ impl Firewall for Nft {
     }
 
     fn setup(&mut self) -> anyhow::Result<()> {
+        let Err(first) = self.run(&Self::setup_script()) else {
+            return Ok(());
+        };
+        if self.recreate_stale_sets()?.is_empty() {
+            return Err(first);
+        }
         self.run(&Self::setup_script())?;
         Ok(())
     }
@@ -285,5 +354,46 @@ mod tests {
         }
         let allow = s.find("@allow4 accept").unwrap();
         assert!(allow < s.find("@crowd4 counter drop").unwrap());
+    }
+
+    #[test]
+    fn recreate_script_keeps_elements_and_lifetimes() {
+        let entries = vec![
+            Entry {
+                net: "10.9.9.9/32".parse().unwrap(),
+                expires_in: Some(Duration::from_secs(3599)),
+            },
+            Entry {
+                net: "198.51.100.0/24".parse().unwrap(),
+                expires_in: None,
+            },
+        ];
+        let s = Nft::recreate_script(
+            "crowd4",
+            "{ type ipv4_addr; flags interval, timeout; timeout 24h; }",
+            &entries,
+        );
+        let lines: Vec<&str> = s.lines().collect();
+        // Rules pinning the set go before the delete, in the same batch.
+        let flush = lines
+            .iter()
+            .position(|l| l.starts_with("flush chain inet minsec input"))
+            .unwrap();
+        let delete = lines
+            .iter()
+            .position(|l| *l == "delete set inet minsec crowd4")
+            .unwrap();
+        assert!(flush < delete);
+        assert_eq!(
+            lines[delete + 1],
+            "add set inet minsec crowd4 { type ipv4_addr; flags interval, timeout; timeout 24h; }"
+        );
+        assert_eq!(
+            lines[delete + 2],
+            "add element inet minsec crowd4 { 10.9.9.9 timeout 3599s, 198.51.100.0/24 }"
+        );
+        assert!(s.lines().all(|l| l.contains("inet minsec")));
+        // An empty set is recreated without an `add element`.
+        assert!(!Nft::recreate_script("crowd6", "{ type ipv6_addr; }", &[]).contains("add element"));
     }
 }

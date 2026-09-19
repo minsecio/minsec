@@ -23,7 +23,10 @@ pub const TABLE: &str = "inet minsec";
 ///
 /// Must match minsec-core's crowd set definition exactly: whichever process
 /// creates the sets first wins, and `add set` on an existing set with a
-/// different definition fails.
+/// different definition fails. The daemon rebuilds a mismatched set at
+/// start (keeping its elements), so a disagreement here means the crowd
+/// sets churn on every daemon restart, and pulls fail until the daemon
+/// has run once on the version that defines them the same way.
 pub const CROWD_TIMEOUT: &str = "24h";
 
 /// Refresh deadline: a full replace re-adds every live element with a fresh

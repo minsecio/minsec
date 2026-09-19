@@ -145,3 +145,11 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+      # minsec.io shows the latest release on its install page; tell it to
+      # rebuild now rather than wait for its daily schedule. SITE_DISPATCH_TOKEN
+      # is a fine-grained PAT with Contents: read and write on minsecio/minsec.io
+      # and nothing else.
+      - name: Rebuild minsec.io
+        env:
+          GH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+        run: gh api repos/minsecio/minsec.io/dispatches -f event_type=agent-release
