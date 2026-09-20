@@ -354,7 +354,11 @@ fn full_cycle_against_mock_backend() {
     assert!(ok);
     assert!(stdout.contains(&format!("host_id: {HOST_ID}")), "{stdout}");
     assert!(stdout.contains("feed basic/v4: snapshot 2"), "{stdout}");
-    assert!(stdout.contains("full replace 0s ago"), "{stdout}");
+    // The pull and this status call can straddle a second boundary.
+    assert!(
+        stdout.contains("full replace 0s ago") || stdout.contains("full replace 1s ago"),
+        "{stdout}"
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }
