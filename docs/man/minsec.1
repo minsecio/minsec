@@ -249,6 +249,26 @@ and
 Use the CLI or
 .B minsec inspect --json
 instead of depending on human-readable output.
+.SH LOG ACCESS
+The packaged service runs as the
+.B minsec
+user with supplementary groups
+.B adm
+and
+.BR systemd-journal ,
+which cover the journal and Debian-style logs.
+Logs the adm group cannot read, such as
+.IR /var/log/httpd ,
+.I /var/log/nginx
+on Enterprise Linux, and Virtualmin per-domain logs under
+.IR /var/log/virtualmin ,
+are granted through POSIX ACLs declared in the package's
+.BR tmpfiles.d (5)
+configuration and reapplied each time the service starts.
+A configured file that exists but cannot be read is reported once with a
+warning; grant the minsec user read access with
+.BR setfacl (1)
+or add a similar tmpfiles.d line.
 .SH ENVIRONMENT
 .TP
 .B MINSEC_LOG

@@ -6,6 +6,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# Reapply log ACLs from minsec.conf, so web servers installed after minsec work.
+ExecStartPre=+systemd-tmpfiles --create minsec.conf
 ExecStart=/usr/bin/minsec daemon
 Restart=on-failure
 RestartSec=2s

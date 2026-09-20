@@ -36,6 +36,8 @@ struct FileState {
     ino: u64,
     pos: u64,
     partial: Vec<u8>,
+    /// A permission error was already reported for this path.
+    denied: bool,
 }
 
 impl FileState {
@@ -46,6 +48,7 @@ impl FileState {
             ino: 0,
             pos: 0,
             partial: Vec::new(),
+            denied: false,
         }
     }
 }
@@ -110,6 +113,9 @@ impl FileTailer {
                 Ok(wd) => {
                     self.dirs.insert(wd, dir.clone());
                 }
+                Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                    tracing::warn!(dir = %dir.display(), "cannot read directory ({e}); its logs will not be followed")
+                }
                 Err(e) => tracing::warn!(dir = %dir.display(), "cannot watch directory ({e}); relying on polling"),
             }
         }
@@ -147,7 +153,8 @@ impl FileTailer {
         let Some(st) = self.files.get_mut(path) else { return };
         let meta = match std::fs::metadata(path) {
             Ok(m) => m,
-            Err(_) => {
+            Err(e) => {
+                Self::note_denied(st, path, &e);
                 if st.file.is_some() {
                     tracing::debug!(path = %path.display(), "file gone; waiting for it to reappear");
                     // Drain what remains of the old inode first.
@@ -176,9 +183,11 @@ impl FileTailer {
                         0
                     };
                     st.file = Some(f);
+                    st.denied = false;
                     tracing::info!(path = %path.display(), offset = st.pos, "following");
                 }
                 Err(e) => {
+                    Self::note_denied(st, path, &e);
                     tracing::debug!(path = %path.display(), "cannot open: {e}");
                     return;
                 }
@@ -186,6 +195,15 @@ impl FileTailer {
         }
         if Self::read_available(st, path, out) {
             self.backlog = true;
+        }
+    }
+
+    /// Warn once per path when a configured file exists but is unreadable.
+    /// Missing files are normal (optional paths, not-yet-rotated-in logs).
+    fn note_denied(st: &mut FileState, path: &Path, e: &std::io::Error) {
+        if e.kind() == std::io::ErrorKind::PermissionDenied && !st.denied {
+            tracing::warn!(path = %path.display(), "cannot read ({e}); check the minsec user's access");
+            st.denied = true;
         }
     }
 
