@@ -265,6 +265,8 @@ on Enterprise Linux, and Virtualmin per-domain logs under
 are granted through POSIX ACLs declared in the package's
 .BR tmpfiles.d (5)
 configuration and reapplied each time the service starts.
+Logrotate preserves them across rotation; a log created later, such as one for
+a new Virtualmin domain, is covered at the next service start.
 A configured file that exists but cannot be read is reported once with a
 warning; grant the minsec user read access with
 .BR setfacl (1)
