@@ -82,7 +82,12 @@ This command is offline and is suitable for checking changes before a restart.
 .SS inspect
 Inspect the merged configuration, discovered files and filters, and effective
 per-filter policy.
-Human-readable output is a short summary; use
+Human-readable output is a one-screen summary: the configuration files that
+were read, the effective defaults and backend, the allow list including the
+implied loopback and host addresses, and for each enabled filter the log files
+or journal matches it actually reads, marking files that do not currently
+exist.
+Use
 .B \-\-json
 for the complete, versioned inspection document.
 This command is offline.

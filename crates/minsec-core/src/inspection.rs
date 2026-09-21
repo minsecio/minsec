@@ -15,6 +15,8 @@ pub struct Inspection {
     pub schema_version: u32,
     pub ok: bool,
     pub version: String,
+    /// Whether journald is present on this host (`/run/systemd/journal`).
+    pub journal_available: bool,
     pub paths: InspectionPaths,
     pub files: InspectionFiles,
     pub effective: EffectiveConfig,
@@ -101,7 +103,13 @@ pub struct EffectivePolicy {
     pub maxretry: u32,
     pub escalation: bool,
     pub files: Vec<String>,
+    /// File patterns that currently match nothing on disk. Not an error: the
+    /// tailer picks a file up when it appears.
+    pub absent_files: Vec<String>,
     pub journal: JournalSelector,
+    /// True when the daemon would read this filter from journald rather than
+    /// from `files` (journald enabled, available, and selectors declared).
+    pub via_journal: bool,
     pub ports: Vec<u16>,
 }
 
@@ -124,6 +132,8 @@ pub struct CheckError {
 pub fn inspect(config_dir: &Path, version: &str) -> anyhow::Result<Inspection> {
     let cfg = Config::load_dir(config_dir)?;
     let files = discover_files(config_dir);
+    let journal_available = crate::source::journal::available();
+    let use_journal = cfg.defaults.journal && journal_available;
     let mut filters = Vec::new();
     for name in all_filter_names(&cfg, &files) {
         let custom_path = config_dir.join("filters").join(format!("{name}.toml"));
@@ -147,7 +157,14 @@ pub fn inspect(config_dir: &Path, version: &str) -> anyhow::Result<Inspection> {
                 findtime_seconds: policy.findtime.as_secs(),
                 maxretry: policy.maxretry,
                 escalation: policy.escalate.is_some(),
+                absent_files: effective_definition
+                    .files
+                    .iter()
+                    .filter(|pattern| !crate::source::file::pattern_exists(pattern))
+                    .cloned()
+                    .collect(),
                 files: effective_definition.files,
+                via_journal: use_journal && !effective_definition.journal.is_empty(),
                 journal: effective_definition.journal,
                 ports: policy.ports,
             },
@@ -157,6 +174,7 @@ pub fn inspect(config_dir: &Path, version: &str) -> anyhow::Result<Inspection> {
         schema_version: SCHEMA_VERSION,
         ok: true,
         version: version.to_string(),
+        journal_available,
         paths: InspectionPaths {
             config_dir: config_dir.to_path_buf(),
             main_config: config_dir.join("minsec.toml"),
@@ -278,8 +296,11 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_config() -> PathBuf {
+        static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let directory = std::env::temp_dir().join(format!("minsec-inspection-{}-{unique}", std::process::id()));
+        let sequence = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let directory =
+            std::env::temp_dir().join(format!("minsec-inspection-{}-{unique}-{sequence}", std::process::id()));
         std::fs::create_dir_all(directory.join("conf.d")).unwrap();
         std::fs::create_dir_all(directory.join("filters")).unwrap();
         directory
@@ -303,6 +324,7 @@ enabled = true
             directory.join("filters/custom.toml"),
             r#"
 name = "custom"
+files = ["/nonexistent/minsec-inspection.log"]
 patterns = ["failed from <HOST>"]
 "#,
         )
@@ -310,6 +332,16 @@ patterns = ["failed from <HOST>"]
 
         let inspection = inspect(&directory, "test-version").unwrap();
         assert_eq!(inspection.schema_version, 1);
+        let custom = inspection
+            .filters
+            .iter()
+            .find(|filter| filter.name == "custom")
+            .unwrap();
+        assert!(!custom.effective_policy.via_journal);
+        assert_eq!(
+            custom.effective_policy.absent_files,
+            vec!["/nonexistent/minsec-inspection.log".to_string()]
+        );
         assert_eq!(inspection.effective.defaults.bantime_seconds, 7200);
         assert_eq!(inspection.effective.defaults.maxretry, 7);
         assert!(inspection

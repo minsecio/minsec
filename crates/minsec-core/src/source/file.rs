@@ -127,7 +127,7 @@ impl FileTailer {
     fn rescan(&mut self) {
         let mut found: Vec<(PathBuf, Arc<str>)> = Vec::new();
         for (pat, _) in &self.patterns {
-            if pat.contains(['*', '?', '[']) {
+            if is_glob(pat) {
                 if let Ok(paths) = glob::glob(pat) {
                     for p in paths.flatten() {
                         found.push((p, pat.clone()));
@@ -302,6 +302,22 @@ impl FileTailer {
             }
         }
         Ok(())
+    }
+}
+
+fn is_glob(pattern: &str) -> bool {
+    pattern.contains(['*', '?', '['])
+}
+
+/// Whether a configured file pattern matches at least one existing path right
+/// now. A `false` is not an error for the tailer, which keeps rescanning.
+pub fn pattern_exists(pattern: &str) -> bool {
+    if is_glob(pattern) {
+        glob::glob(pattern)
+            .map(|paths| paths.flatten().next().is_some())
+            .unwrap_or(false)
+    } else {
+        std::path::Path::new(pattern).exists()
     }
 }
 

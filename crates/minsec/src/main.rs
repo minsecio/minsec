@@ -5,7 +5,7 @@ mod daemon;
 
 use clap::Parser;
 use cli::{Cli, Cmd};
-use minsec_core::config::Config;
+use minsec_core::config::{BackendKind, Config};
 use minsec_core::control::{self, Request};
 use minsec_core::{builtin, CompiledFilter};
 
@@ -24,9 +24,9 @@ fn run() -> anyhow::Result<()> {
             let mut cfg = Config::load_dir(&cli.config_dir)?;
             if let Some(b) = backend {
                 cfg.defaults.backend = match b.as_str() {
-                    "nft" => minsec_core::config::BackendKind::Nft,
-                    "null" => minsec_core::config::BackendKind::Null,
-                    "exec" => minsec_core::config::BackendKind::Exec,
+                    "nft" => BackendKind::Nft,
+                    "null" => BackendKind::Null,
+                    "exec" => BackendKind::Exec,
                     other => unreachable!("clap validates --backend, got `{other}`"),
                 };
             }
@@ -58,9 +58,7 @@ fn run() -> anyhow::Result<()> {
                 if cli.json {
                     println!("{}", serde_json::to_string(&inspection)?);
                 } else {
-                    println!("minsec {} schema {}", inspection.version, inspection.schema_version);
-                    println!("config: {}", inspection.paths.config_dir.display());
-                    println!("filters: {}", inspection.filters.len());
+                    print_inspection(&inspection);
                 }
                 Ok(())
             }
@@ -309,6 +307,161 @@ fn set_enabled(dir: &std::path::Path, name: &str, enabled: bool) -> anyhow::Resu
         path.display()
     );
     Ok(())
+}
+
+/// One-screen human summary of an inspection: where configuration came from,
+/// the effective defaults, the full allow list, and what each enabled filter
+/// actually reads. `--json` has everything else.
+fn print_inspection(inspection: &minsec_core::inspection::Inspection) {
+    use minsec_core::duration::format as fmt_duration;
+    use std::time::Duration;
+
+    let secs = |s: u64| fmt_duration(Duration::from_secs(s));
+    let relative = |path: &std::path::Path| {
+        path.strip_prefix(&inspection.paths.config_dir)
+            .unwrap_or(path)
+            .display()
+            .to_string()
+    };
+    let defaults = &inspection.effective.defaults;
+
+    println!(
+        "minsec {} · config {} · schema {}",
+        inspection.version,
+        inspection.paths.config_dir.display(),
+        inspection.schema_version
+    );
+    let mut files: Vec<String> = Vec::new();
+    match &inspection.files.main {
+        Some(main) => files.push(relative(main)),
+        None => files.push(format!("{} (missing)", relative(&inspection.paths.main_config))),
+    }
+    files.extend(inspection.files.dropins.iter().map(|p| relative(p)));
+    files.extend(inspection.files.custom_filters.iter().map(|p| relative(p)));
+    println!("files: {}", files.join(", "));
+    println!(
+        "paths: socket {} · state {}",
+        inspection.paths.control_socket.display(),
+        inspection.paths.state_dir.display()
+    );
+    let escalate = if defaults.escalate_enabled {
+        format!(
+            "escalate x{} up to {} (remembered {})",
+            defaults.escalate.factor,
+            secs(defaults.escalate.max_seconds),
+            secs(defaults.escalate.memory_seconds)
+        )
+    } else {
+        "escalate off".to_string()
+    };
+    println!(
+        "defaults: retry {} in {} · ban {} · {} · ipv6 /{} · max tracked {}",
+        defaults.maxretry,
+        secs(defaults.findtime_seconds),
+        secs(defaults.bantime_seconds),
+        escalate,
+        defaults.ipv6_prefix,
+        defaults.max_tracked
+    );
+    let journal = match (defaults.journal, inspection.journal_available) {
+        (false, _) => "off (files only)",
+        (true, true) => "on",
+        (true, false) => "on but not available (files only)",
+    };
+    let backend = match (defaults.backend, &defaults.exec_command) {
+        (BackendKind::Nft, _) => "nft".to_string(),
+        (BackendKind::Null, _) => "null (deciding, not enforcing)".to_string(),
+        (BackendKind::Exec, Some(command)) => format!("exec `{command}`"),
+        (BackendKind::Exec, None) => "exec (no exec_command set)".to_string(),
+    };
+    println!("backend: {backend} · journald: {journal}");
+
+    let configured: Vec<String> = defaults.allow.iter().map(|n| n.to_string()).collect();
+    println!(
+        "allow: {}",
+        if configured.is_empty() {
+            "(none configured)".to_string()
+        } else {
+            configured.join(", ")
+        }
+    );
+    let mut host: Vec<String> = minsec_core::ip::local_addresses()
+        .into_iter()
+        .filter(|ip| !minsec_core::ip::is_loopback_or_unspecified(*ip))
+        .map(|ip| ip.to_string())
+        .collect();
+    host.sort();
+    host.dedup();
+    println!(
+        "  always: loopback, {}",
+        if host.is_empty() {
+            "this host's addresses".to_string()
+        } else {
+            host.join(", ")
+        }
+    );
+
+    let (enabled, disabled): (Vec<_>, Vec<_>) = inspection.filters.iter().partition(|f| f.enabled);
+    println!("enabled filters ({} of {}):", enabled.len(), inspection.filters.len());
+    for f in &enabled {
+        let p = &f.effective_policy;
+        let ports = if p.ports.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " · ports {}",
+                p.ports.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(",")
+            )
+        };
+        let origin = if f.builtin {
+            String::new()
+        } else {
+            format!("  ({})", relative(std::path::Path::new(&f.source)))
+        };
+        println!(
+            "  {:<14} retry {} in {} · ban {}{}{}",
+            f.name,
+            p.maxretry,
+            secs(p.findtime_seconds),
+            secs(p.bantime_seconds),
+            ports,
+            origin
+        );
+        if p.via_journal {
+            println!("{:<17}journal: {}", "", p.journal.matches().join(", "));
+        } else if p.files.is_empty() {
+            println!(
+                "{:<17}source: none (no files and journald not in use) — filter is inert",
+                ""
+            );
+        } else {
+            let files: Vec<String> = p
+                .files
+                .iter()
+                .map(|file| {
+                    if p.absent_files.contains(file) {
+                        format!("{file} (absent)")
+                    } else {
+                        file.clone()
+                    }
+                })
+                .collect();
+            println!("{:<17}files: {}", "", files.join(", "));
+        }
+    }
+    if !disabled.is_empty() {
+        let names: Vec<String> = disabled
+            .iter()
+            .map(|f| {
+                if f.builtin {
+                    f.name.clone()
+                } else {
+                    format!("{} (custom)", f.name)
+                }
+            })
+            .collect();
+        println!("disabled: {}", names.join(", "));
+    }
 }
 
 fn init_logging() {
