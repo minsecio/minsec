@@ -8,7 +8,10 @@
    version="1.1"
    id="svg1"
    inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
-   sodipodi:docname="minsec-aperture-logo.svg"
+   sodipodi:docname="minsec-aperture-logo-dark.svg"
+   inkscape:export-filename="minsec-aperture-logo-momo.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -26,7 +29,7 @@
      inkscape:zoom="2.5799102"
      inkscape:cx="130.6247"
      inkscape:cy="158.33884"
-     inkscape:window-width="1626"
+     inkscape:window-width="1884"
      inkscape:window-height="1190"
      inkscape:window-x="26"
      inkscape:window-y="23"
@@ -74,14 +77,14 @@
     </g>
     <text
        xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:600;font-stretch:normal;font-size:12.7px;font-family:Montserrat;-inkscape-font-specification:'Montserrat Semi-Bold';writing-mode:lr-tb;direction:ltr;fill:#143e48;fill-opacity:1;stroke-width:0.264583"
-       x="12.705153"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:12.7px;font-family:'Momo Trust Display';-inkscape-font-specification:'Momo Trust Display';writing-mode:lr-tb;direction:ltr;fill:#241f1a;fill-opacity:1;stroke-width:0.264583"
+       x="11.955853"
        y="60.030621"
        id="text1"><tspan
          sodipodi:role="line"
          id="tspan1"
-         style="font-style:normal;font-variant:normal;font-weight:600;font-stretch:normal;font-size:12.7px;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans Semi-Bold';fill:#143e48;fill-opacity:1;stroke-width:0.264583"
-         x="12.705153"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:12.7px;font-family:'Momo Trust Display';-inkscape-font-specification:'Momo Trust Display';fill:#241f1a;fill-opacity:1;stroke-width:0.264583"
+         x="11.955853"
          y="60.030621">minsec</tspan></text>
   </g>
 </svg>
