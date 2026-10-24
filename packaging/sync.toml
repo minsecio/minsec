@@ -4,9 +4,9 @@
 # enrolls this system automatically, reports automatic bans (attacker
 # network + abuse category only — never log lines, usernames, or anything
 # about your users; see https://minsec.io/privacy), and pulls the shared
-# blocklist into the crowd4/crowd6 nftables sets. Delete the file (and
-# `nft flush set inet minsec crowd4; nft flush set inet minsec crowd6`) to
-# opt back out.
+# blocklist into the crowd nftables sets. Delete the file (and flush the
+# crowd4, crowd6, crowdnet4 and crowdnet6 sets with `nft flush set inet
+# minsec <set>`) to opt back out.
 #
 # Every setting is optional; the defaults are shown.
 

@@ -26,7 +26,7 @@ pub(crate) enum Cmd {
     Enroll,
     /// Submit new automatic bans from the events log.
     Report,
-    /// Fetch the crowd blocklist into the crowd4/crowd6 nftables sets.
+    /// Fetch the crowd blocklist into the crowd nftables sets.
     Pull,
     /// Report then pull; enrolls first if needed. Intended for the systemd
     /// timer — exits 0 quietly when multiplayer is not configured.

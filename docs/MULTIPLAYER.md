@@ -45,23 +45,27 @@ proof-of-work), then reports new bans and refreshes the blocklist. Hourly is
 the free tier's cadence; the crowd list is a slow-moving reputation feed, not
 a real-time signal, and local filters catch an attacker on your own machine
 long before the crowd hears about it.
-Remove the file to opt out; `nft flush set inet minsec crowd4` (and
-`crowd6`) clears the pulled list immediately.
+Remove the file to opt out; flushing the crowd sets (`nft flush set inet
+minsec crowd4`, and likewise `crowd6`, `crowdnet4`, `crowdnet6`) clears the
+pulled list immediately.
 
 `report` and `pull` can be toggled independently in `sync.toml` — you can
 pull the crowd blocklist without contributing, or vice versa.
 
 ## Where the blocklist lands
 
-The daemon's nftables setup creates two extra sets in the `inet minsec`
-table, `crowd4` and `crowd6`, enforced after your allowlist and local
-bans. `minsec-sync pull` maintains their contents (full replaces are one
+The daemon's nftables setup creates four extra sets in the `inet minsec`
+table, enforced after your allowlist and local bans: hash sets `crowd4` and
+`crowd6` for single IPv4 addresses and IPv6 /64s, the usual entries in the
+feed, and interval sets `crowdnet4` and `crowdnet6` for wider prefixes.
+`minsec-sync pull` maintains their contents (full replaces are one
 atomic nft transaction; most refreshes are deltas or `304 Not Modified`).
-They are separate from the local `ban4`/`ban6` sets so you can always see
-which blocks came from the crowd:
+They are separate from the local ban sets (`ban4`, `ban6`, `bannet4`,
+`bannet6`) so you can always see which blocks came from the crowd:
 
 ```sh
 nft list set inet minsec crowd4
+nft list set inet minsec crowdnet4
 ```
 
 ## Commands
@@ -69,7 +73,7 @@ nft list set inet minsec crowd4
 ```sh
 minsec-sync enroll          # generate key + enroll (run does this automatically)
 minsec-sync report          # submit new automatic bans from the events log
-minsec-sync pull            # refresh crowd4/crowd6
+minsec-sync pull            # refresh the crowd sets
 minsec-sync pull --dry-run  # print the nft script instead of applying it
 minsec-sync run             # report + pull; what the timer runs
 minsec-sync status          # enrollment, cursor, and feed state
@@ -85,7 +89,7 @@ disabled — drains the crowd sets within a day rather than enforcing a frozen
 snapshot indefinitely. `minsec-sync status` shows the age of the last
 successful pull and of each set's last full replace.
 
-Your own `ban4`/`ban6` entries are untouched by any of this; they carry the
+Your own local ban entries are untouched by any of this; they carry the
 TTLs the daemon gave them.
 
 State (key, host id, events-log cursor, feed cursors) lives in

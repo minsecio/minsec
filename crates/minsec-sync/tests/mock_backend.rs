@@ -305,6 +305,11 @@ fn full_cycle_against_mock_backend() {
     assert!(stdout.contains("flush set inet minsec crowd4"), "{stdout}");
     assert!(stdout.contains("203.0.113.7"), "{stdout}");
     assert!(stdout.contains("198.51.100.0/24"), "{stdout}");
+    assert!(stdout.contains("flush set inet minsec crowdnet4"), "{stdout}");
+    assert!(
+        stdout.contains("add element inet minsec crowdnet4 { 198.51.100.0/24 }"),
+        "{stdout}"
+    );
     assert!(stdout.contains("feed v4: full update, 2 entries"), "{stdout}");
 
     // Pull #2: unchanged (ETag hit).

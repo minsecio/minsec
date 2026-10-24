@@ -63,14 +63,18 @@ Default:
 .BI ipv4 " = boolean"
 Fetch and maintain the IPv4
 .B crowd4
-set during a pull.
+and
+.B crowdnet4
+sets during a pull.
 Default:
 .BR true .
 .TP
 .BI ipv6 " = boolean"
 Fetch and maintain the IPv6
 .B crowd6
-set during a pull.
+and
+.B crowdnet6
+sets during a pull.
 Default:
 .BR true .
 .TP
@@ -114,9 +118,9 @@ State updates use a temporary file followed by rename.
 Protect this directory and preserve it across upgrades.
 .PP
 Pull operations manage only the
-.B crowd4
+.BR crowd4 ", " crowd6 ", " crowdnet4 ,
 and
-.B crowd6
+.B crowdnet6
 sets in
 .BR "table inet minsec" ,
 creating the table and the sets themselves if they do not yet exist.

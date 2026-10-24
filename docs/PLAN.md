@@ -37,7 +37,7 @@ This document is the recommended design; it is not an exhaustive survey.
 | Log sources | inotify-driven file tailer + journald via `dlopen("libsystemd.so.0")` (no hard link dependency) with `journalctl -o export -f` subprocess fallback | Journald native API supports server-side match filters (`_SYSTEMD_UNIT=sshd.service`) so we only wake for relevant entries. |
 | Matching | `regex` crate (`RegexSet` + literal prefilter via `aho-corasick`), fail2ban-compatible `<HOST>`/`<ADDR>` tokens, DFA size caps | Reuse of existing filter knowledge and easy migration; the regex crate's memory is bounded by config, not by traffic. |
 | State model | Streaming: no log lines retained. Per-(filter, ip) compact sliding-window counters in a bounded map with LRU eviction. Kernel nft set **with element timeouts** is the source of truth for active bans. | This is the single biggest departure from fail2ban's memory model. |
-| Firewall MVP | **nftables**, own `inet minsec` table, sets `ban4`/`ban6` with `flags timeout,interval`, hook `input`/`forward` at priority `-10` (before firewalld/iptables-nft filter chains) | Kernel expires bans itself; bans survive daemon restarts; coexists with firewalld and iptables-nft without touching their rules. |
+| Firewall MVP | **nftables**, own `inet minsec` table, hash sets `ban4`/`ban6` with `flags timeout` (interval sets `bannet4`/`bannet6` only for manual network bans), hook `input`/`forward` at priority `-10` (before firewalld/iptables-nft filter chains) | Kernel expires bans itself; bans survive daemon restarts; coexists with firewalld and iptables-nft without touching their rules. |
 | Firewall later | ipset+iptables (legacy EL/older Debian), firewalld-via-nft (already covered), pf (FreeBSD/OpenBSD), ipfw, `exec` (script escape hatch), `null` (dry-run/log-only) | |
 | Config | TOML: `/etc/minsec/minsec.toml` + `/etc/minsec/conf.d/*.toml`; built-in filter library compiled into the binary, overridable by files | One format, one directory, `minsec enable sshd` style UX. |
 | Control | Unix socket at `/run/minsec/minsec.sock`, newline-delimited JSON request/response; CLI is a thin client with `--json` | Virtualmin's Perl side speaks JSON over a socket trivially; no scraping. |
@@ -99,13 +99,17 @@ daemon's state so it stays fast.
 
 ```
 table inet minsec {
-  set ban4 { type ipv4_addr; flags timeout,interval; }
-  set ban6 { type ipv6_addr; flags timeout,interval; }
+  set ban4 { type ipv4_addr; flags timeout; }
+  set ban6 { type ipv6_addr; flags timeout; }            # /64 network addresses
+  set bannet4 { type ipv4_addr; flags timeout,interval; } # manual network bans
+  set bannet6 { type ipv6_addr; flags timeout,interval; }
   set allow4 { type ipv4_addr; flags interval; }
   set allow6 { type ipv6_addr; flags interval; }
   chain input   { type filter hook input   priority -10; policy accept;
                   ip  saddr @allow4 accept; ip6 saddr @allow6 accept;
-                  ip  saddr @ban4 counter drop; ip6 saddr @ban6 counter drop; }
+                  ip  saddr @ban4 counter drop;
+                  ip6 saddr & ffff:ffff:ffff:ffff:: @ban6 counter drop;
+                  ip  saddr @bannet4 counter drop; ip6 saddr @bannet6 counter drop; }
   chain forward { type filter hook forward priority -10; policy accept; ... same ... }
 }
 ```
@@ -200,7 +204,9 @@ plausible Phase-3 item (format is documented and stable) but is not worth MVP ri
 
 ### 4.3 IPv6
 Ban by /64 by default (attackers rotate within their allocation); configurable
-per filter. Sets use `interval` flag so prefixes are native.
+per filter. `ban6` is a hash set of network addresses looked up through a
+mask, not an interval set: interval sets with timeouts have corrupted on EL8
+kernels (an element lost its end marker and grew to cover a fifth of IPv4).
 
 ### 4.4 Log rotation and bursts
 inotify + inode tracking covers `logrotate` rename and copytruncate. On startup
@@ -216,7 +222,7 @@ interactively. `minsec ban` refuses the client's own address without `--force`.
 ### 4.6 Multiplayer (Phase 4) — designed in now, built later
 - Report schema (`minsec-proto`): `{ts, ip, filter, count, ban_ttl, host_id(anon), version}`; no log lines, no usernames by default (privacy + GDPR posture: IP + category only, explicit opt-in, documented retention).
 - `minsec-sync report` reads the events cursor, batches, signs with a per-install key (Ed25519, generated at first run), POSTs.
-- `minsec-sync pull` fetches a delta feed (plain text / compact binary, ETag), writes it into dedicated sets `crowd4`/`crowd6` (separate from local bans so users can disable or audit it), and optionally only for "high-confidence" tiers — the free/paid split lives here.
+- `minsec-sync pull` fetches a delta feed (plain text / compact binary, ETag), writes it into dedicated sets `crowd4`/`crowd6` (hosts and /64s, hash) and `crowdnet4`/`crowdnet6` (wider prefixes, interval) (hosts and /64s, hash) and `crowdnet4`/`crowdnet6` (wider prefixes, interval) (separate from local bans so users can disable or audit it), and optionally only for "high-confidence" tiers — the free/paid split lives here.
 - Abuse-resistance of the feed is a server-side problem (reporter reputation, quorum across N independent reporters, allowlists of major providers) and a separate repo; noting it so the report schema includes what that needs (host_id, version, filter).
 - WAF / reputation lookups / per-request decisions are **not** in the daemon; they'd be an nginx/apache module or a separate service consuming the same sets.
 

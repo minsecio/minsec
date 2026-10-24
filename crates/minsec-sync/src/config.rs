@@ -19,7 +19,7 @@ pub struct Config {
     pub tier: String,
     /// Report local automatic bans to the crowd.
     pub report: bool,
-    /// Pull the crowd blocklist into the crowd4/crowd6 nftables sets.
+    /// Pull the crowd blocklist into the crowd nftables sets.
     pub pull: bool,
     pub ipv4: bool,
     pub ipv6: bool,

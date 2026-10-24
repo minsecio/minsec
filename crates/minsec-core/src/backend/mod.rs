@@ -36,7 +36,7 @@ pub trait Firewall {
 pub fn open(cfg: &crate::config::Defaults) -> anyhow::Result<Box<dyn Firewall>> {
     use crate::config::BackendKind::*;
     Ok(match cfg.backend {
-        Nft => Box::new(nft::Nft::new()),
+        Nft => Box::new(nft::Nft::new().with_v6_prefix(cfg.ipv6_prefix)),
         Null => Box::new(null::Null::default()),
         Exec => Box::new(exec::Exec::new(cfg.exec_command.clone().expect("validated"))),
     })

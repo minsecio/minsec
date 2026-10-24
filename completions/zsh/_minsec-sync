@@ -6,7 +6,7 @@ _minsec-sync_commands() {
     local -a commands=(
         'enroll:Generate a key (first run) and enroll with the server'
         'report:Submit new automatic bans from the events log'
-        'pull:Fetch the crowd blocklist into the crowd4/crowd6 nftables sets'
+        'pull:Fetch the crowd blocklist into the crowd nftables sets'
         'run:Report then pull; enrolls first if needed'
         'status:Show enrollment, cursor, and feed state'
         'help:Print help for a subcommand'

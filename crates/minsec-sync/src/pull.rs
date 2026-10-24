@@ -1,5 +1,5 @@
 //! `minsec-sync pull`: fetch the crowd blocklist (ETag + delta aware) and
-//! write it into the crowd4/crowd6 nftables sets.
+//! write it into the crowd nftables sets.
 
 use crate::client::{now_unix, Api, FeedFetch};
 use crate::config::Config;
@@ -75,8 +75,8 @@ fn pull_family(
                     Ok(o) => o,
                     Err(e) => {
                         // A delta that no longer matches our set contents
-                        // (missed pull, manual edits): resync from a full
-                        // fetch instead of failing.
+                        // (missed pull, manual edits, a corrupted set):
+                        // resync from a full fetch instead of failing.
                         eprintln!("minsec-sync: delta for v{family} failed ({e:#}); refetching full feed");
                         return fetch_full(cfg, api, store, state, nft, family, &key, fam, false);
                     }
@@ -154,6 +154,7 @@ fn apply_full(nft: &Nft, family: u8, feed: &Feed) -> anyhow::Result<Outcome> {
         })
         .collect();
     nft.replace(family, &nets)?;
+    nft.check_nets(family)?;
     Ok(Outcome {
         family,
         action: "full",
@@ -179,7 +180,9 @@ fn apply_delta(nft: &Nft, family: u8, feed: &Feed) -> anyhow::Result<Outcome> {
     };
     let added = parse(&feed.added);
     let removed = parse(&feed.removed);
-    nft.apply_delta(family, &added, &removed)?;
+    nft.apply_delta(&added, &removed)?;
+    // Corruption fails the delta, and the caller's full replace clears it.
+    nft.check_nets(family)?;
     Ok(Outcome {
         family,
         action: "delta",
