@@ -24,7 +24,8 @@ constraints fail2ban does not meet:
 blocklist feed — lives in the separate `minsec-sync` helper so the resident
 daemon is minimalist and auditable; it reports automatic bans (attacker network
 and abuse category only) and pulls the crowd blocklist into dedicated
-`crowd4`/`crowd6` nftables sets. See [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md)
+`crowd4`/`crowd6` and `crowdnet4`/`crowdnet6` nftables sets. See
+[docs/MULTIPLAYER.md](docs/MULTIPLAYER.md)
 to opt in, and [docs/PLAN.md](docs/PLAN.md) for the full design and roadmap.
 
 ## Status
@@ -120,7 +121,8 @@ Complete command and configuration references are installed as
 ## Firewall
 
 The nftables backend owns `table inet minsec` and nothing else: sets `ban4`,
-`ban6`, `allow4`, `allow6` and `input`/`forward` chains at priority -10, so it
+`ban6`, `bannet4`, `bannet6`, `allow4`, `allow6`, `crowd4`, `crowd6`,
+`crowdnet4`, `crowdnet6` and `input`/`forward` chains at priority -10, so it
 composes with firewalld or iptables-nft without modifying their rules. The
 `exec` backend runs a script (`<cmd> ban <net> <ttl>` / `<cmd> unban <net>`)
 for anything else; ipset and pf backends are on the roadmap.

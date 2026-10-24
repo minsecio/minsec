@@ -11,11 +11,11 @@ is the opt-in multiplayer client for
 .BR minsec (1).
 It is a short-lived program intended to run periodically from a systemd timer.
 It enrolls the host, reports new automatic bans from the daemon event log, and
-loads a selected crowd blocklist into the dedicated nftables
-.B crowd4
-and
-.B crowd6
-sets.
+loads a selected crowd blocklist into the dedicated nftables crowd sets:
+.BR crowd4 / crowd6
+for single IPv4 addresses and IPv6 /64 networks, and
+.BR crowdnet4 / crowdnet6
+for wider prefixes.
 .PP
 The resident daemon contains no HTTP or TLS client.
 Network activity and private signing-key management are isolated in this
@@ -83,18 +83,18 @@ Under normal operation the list is therefore refreshed long before anything
 expires; if pulls stop reaching the server, the crowd sets drain within a day
 instead of enforcing their last snapshot until the machine reboots.
 Local bans in
-.B ban4
+.BR ban4 ", " ban6 ", " bannet4 ,
 and
-.B ban6
+.B bannet6
 are unaffected.
 .PP
 This command manages only
-.B crowd4
+.BR crowd4 ", " crowd6 ", " crowdnet4 ,
 and
-.B crowd6
+.B crowdnet6
 in
 .BR "table inet minsec" .
-It creates that table and those two sets idempotently, so a pull works before
+It creates that table and those sets idempotently, so a pull works before
 the daemon has been restarted onto a crowd-aware version; the sets are simply
 unreferenced until then.
 The daemon owns the chains and rules that reference those sets.
@@ -137,11 +137,13 @@ server and a usable CA trust store.
 .PP
 Disabling reporting or pulling does not remove existing crowd set entries.
 To opt out completely, remove the sync configuration, stop or disable the
-timer, and flush both crowd sets if immediate removal is desired:
+timer, and flush the crowd sets if immediate removal is desired:
 .PP
 .nf
 nft flush set inet minsec crowd4
 nft flush set inet minsec crowd6
+nft flush set inet minsec crowdnet4
+nft flush set inet minsec crowdnet6
 .fi
 .SH FILES
 .TP

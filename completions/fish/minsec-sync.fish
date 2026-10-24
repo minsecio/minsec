@@ -27,7 +27,7 @@ complete -c minsec-sync -n __minsec_sync_needs_command -s V -l version -d 'Print
 
 complete -c minsec-sync -n __minsec_sync_needs_command -a enroll -d 'Generate a key (first run) and enroll with the server'
 complete -c minsec-sync -n __minsec_sync_needs_command -a report -d 'Submit new automatic bans from the events log'
-complete -c minsec-sync -n __minsec_sync_needs_command -a pull -d 'Fetch the crowd blocklist into the crowd4/crowd6 nftables sets'
+complete -c minsec-sync -n __minsec_sync_needs_command -a pull -d 'Fetch the crowd blocklist into the crowd nftables sets'
 complete -c minsec-sync -n __minsec_sync_needs_command -a run -d 'Report then pull; enrolls first if needed'
 complete -c minsec-sync -n __minsec_sync_needs_command -a status -d 'Show enrollment, cursor, and feed state'
 complete -c minsec-sync -n __minsec_sync_needs_command -a help -d 'Print help for a subcommand'

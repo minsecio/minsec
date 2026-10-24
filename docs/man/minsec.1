@@ -191,12 +191,19 @@ and
 .B nft
 Owns only
 .BR "table inet minsec" .
-It creates local ban sets
-.BR ban4 / ban6 ,
-allow sets
+It creates hash sets
+.BR ban4 / ban6
+for bans of one address or one
+.B ipv6_prefix
+network (stored as its network address),
+interval sets
+.BR bannet4 / bannet6
+for manual bans of other networks, allow sets
 .BR allow4 / allow6 ,
 crowd-feed sets
-.BR crowd4 / crowd6 ,
+.BR crowd4 / crowd6
+(hash sets, IPv6 keyed by /64) and
+.BR crowdnet4 / crowdnet6 ,
 and input and forward base chains at priority \-10.
 Allow rules precede drop rules.
 The daemon requires permission to execute

@@ -138,6 +138,9 @@ There is no default.
 Prefix length used to aggregate IPv6 addresses for tracking and banning.
 It must be from 1 through 128.
 For example, the default 64 tracks and bans one /64 rather than each /128.
+Changing it re-keys existing IPv6 bans at the next start: a wider prefix
+widens them, and bans under a narrower prefix keep their old width until
+they expire.
 IPv4 addresses are tracked as /32.
 .TP
 .BI max_tracked " = integer"
