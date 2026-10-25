@@ -21,6 +21,9 @@ branch=$(git rev-parse --abbrev-ref HEAD)
 git fetch -q origin main
 [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] || { echo "main is not in sync with origin/main" >&2; exit 1; }
 git rev-parse -q --verify "refs/tags/v$ver" >/dev/null && { echo "tag v$ver already exists" >&2; exit 1; }
+# A tag pushed by hand but never fetched would reject our tag push after
+# main had already gone up, leaving a release commit with no tag.
+git ls-remote -q --exit-code --tags origin "refs/tags/v$ver" >/dev/null && { echo "tag v$ver already exists on origin" >&2; exit 1; }
 
 cur=$(grep -m1 -E '^version = "' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
 echo "bumping $cur -> $ver"
@@ -31,7 +34,7 @@ git commit -q -m "Release v$ver"
 git tag -a "v$ver" -m "minsec $ver"
 
 if (( push )); then
-    git push origin main "v$ver"
+    git push --atomic origin main "v$ver"
     echo "pushed; release workflow running: $(gh repo view --json url -q .url 2>/dev/null)/actions"
 else
     echo "created commit and tag v$ver locally; push with: git push origin main v$ver"
