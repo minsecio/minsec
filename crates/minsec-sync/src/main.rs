@@ -171,6 +171,7 @@ fn enroll(api: &Api, store: &Store, state: &mut state::State, verbose: bool) -> 
             pubkey: B64.encode(key.verifying_key().to_bytes()),
             agent_version: concat!("minsec-sync/", env!("CARGO_PKG_VERSION")).to_string(),
             install_token: None,
+            product: None,
         };
         match api.enroll(&req) {
             Ok(resp) => {
