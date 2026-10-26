@@ -72,9 +72,14 @@ for i in 1 2 3; do
     # the field survives the round trip.
     printf '{"kind":"ban","ts":%s,"net":"%s/32","filter":"sshd","ttl":600,"hits":5,"escalation":%s,"manual":false}\n' \
         "$NOW" "$ATTACKER" "$i" >"$dir/events.jsonl"
-    printf '{"kind":"ban","ts":%s,"net":"%s/32","filter":"postfix-sasl","ttl":600,"hits":4,"manual":false}\n' \
+    printf '{"kind":"ban","ts":%s,"net":"%s/32","filter":"postfix-sasl","ttl":600,"hits":4,"escalation":0,"manual":false}\n' \
         "$NOW" "$ATTACKER" >>"$dir/events.jsonl"
     "$SYNC" --config "$dir/sync.toml" enroll | grep -q "enrolled as " || { echo "agent $i enroll failed"; exit 1; }
+    # Every agent enrolls over loopback, and the crowd counts one vote per
+    # enrollment network: record each as enrolling from a site of its own.
+    id="$("$SYNC" --config "$dir/sync.toml" status | sed -n 's/^host_id: *//p')"
+    PGPASSWORD="${PGPASSWORD:-minsec}" psql "$DB_URL" -qtAc \
+        "update agents set enroll_ip = '198.51.$i.1' where host_id = '$id'" >/dev/null
     "$SYNC" --config "$dir/sync.toml" report | grep -q "2 accepted" || { echo "agent $i report failed"; exit 1; }
 done
 
@@ -103,4 +108,19 @@ esc="$(PGPASSWORD="${PGPASSWORD:-minsec}" psql "$DB_URL" -tAc \
 echo "== idempotent re-report is a no-op"
 "$SYNC" --config "$TMP/agent1/sync.toml" report | grep -q "reported 0 events" || { echo "cursor did not hold"; exit 1; }
 
-echo "PASS: enroll -> signed report -> quorum -> feed + dnsbl -> 304, Rust client against Go backend"
+echo "== an anonymous agent joins an organization with an install token"
+"$TMP/minsecd" admin org create Acme >/dev/null
+token="$("$TMP/minsecd" admin org token Acme 2>/dev/null)"
+printf 'install_token = "%s"\nlabel = "mx1"\n' "$token" >>"$TMP/agent1/sync.toml"
+out="$("$SYNC" --config "$TMP/agent1/sync.toml" --dry-run run 2>&1)"
+echo "$out" | grep -q "re-enrolling" || { echo "no re-enrollment:"; echo "$out"; exit 1; }
+"$SYNC" --config "$TMP/agent1/sync.toml" status | grep -q "^org: *Acme$" || { echo "not in the organization"; exit 1; }
+label="$(PGPASSWORD="${PGPASSWORD:-minsec}" psql "$DB_URL" -tAc \
+    "select a.label from agents a join orgs o on o.id = a.org_id where o.name = 'Acme'")"
+[ "$label" = "mx1" ] || { echo "label = $label, want mx1"; exit 1; }
+out="$("$SYNC" --config "$TMP/agent1/sync.toml" --dry-run run 2>&1)"
+if echo "$out" | grep -q "re-enrolling"; then
+    echo "re-enrolled twice"; exit 1
+fi
+
+echo "PASS: enroll -> signed report -> quorum -> feed + dnsbl -> 304 -> org join, Rust client against Go backend"

@@ -98,12 +98,15 @@ impl Api {
         Ok(body)
     }
 
-    pub fn challenge(&self) -> anyhow::Result<types::Challenge> {
+    pub fn challenge(&self, install_token: Option<&str>) -> anyhow::Result<types::Challenge> {
+        let req = types::ChallengeRequest {
+            install_token: install_token.map(str::to_string),
+        };
         let mut resp = self
             .agent
             .post(self.url("/v1/enroll/challenge"))
             .header("Content-Type", "application/json")
-            .send("{}")?;
+            .send(serde_json::to_string(&req).expect("serializable"))?;
         let body = Self::read_ok(&mut resp)?;
         let ch: types::Challenge = serde_json::from_str(&body)?;
         if ch.algo != types::POW_ALGO {

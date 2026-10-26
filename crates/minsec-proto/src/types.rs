@@ -36,6 +36,15 @@ pub struct ReportResponse {
     pub duplicate: bool,
 }
 
+/// Body of `POST /v1/enroll/challenge`. An install token is optional; a
+/// valid one moves the challenge from the per-address enrollment limit to
+/// the token's own, so a fleet behind one NAT address can enroll at once.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ChallengeRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub install_token: Option<String>,
+}
+
 /// Response of `POST /v1/enroll/challenge`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Challenge {
@@ -55,8 +64,14 @@ pub struct EnrollRequest {
     /// base64 (std) 32-byte Ed25519 public key.
     pub pubkey: String,
     pub agent_version: String,
-    /// Reserved for Virtualmin licensing; always null in v1.
+    /// Binds the enrollment to the organization that issued the token
+    /// (fleet management). Null for an anonymous crowd agent.
     pub install_token: Option<String>,
+    /// The host's name in its organization's fleet views and alerts; see
+    /// [`sanitize_label`]. Stored only for an enrollment bound to an
+    /// organization.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     /// [`PRODUCT_MINSEC`] (the server's default when absent) or
     /// [`PRODUCT_MINSEC_ID`].
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -75,6 +90,28 @@ pub struct EnrollResponse {
     pub feed_url: String,
     /// Minimum seconds between report submissions.
     pub min_report_interval: u64,
+    /// The organization an install token bound this enrollment to.
+    #[serde(default)]
+    pub org: Option<String>,
+}
+
+/// Longest label the backend stores.
+pub const LABEL_MAX: usize = 64;
+
+/// A host label as the backend accepts it: ASCII letters, digits, `.`, `_`
+/// and `-`, starting with a letter or digit, at most [`LABEL_MAX`] bytes;
+/// a hostname fits. Other characters are dropped and the result truncated.
+/// `None` when nothing usable is left.
+pub fn sanitize_label(s: &str) -> Option<String> {
+    let mut out: String = s
+        .trim()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+        .collect();
+    let start = out.find(|c: char| c.is_ascii_alphanumeric())?;
+    out.drain(..start);
+    out.truncate(LABEL_MAX);
+    Some(out)
 }
 
 /// Error body used by every non-2xx JSON response.
@@ -115,6 +152,10 @@ pub struct FindingsReport {
     /// The checks the host ran: the denominator for the counts.
     pub checks: Vec<String>,
     pub counts: Vec<FindingCount>,
+    /// The host's current label, sent by an agent bound to an
+    /// organization so a renamed host is renamed in its fleet views.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -174,4 +215,24 @@ pub struct HashCheckResult {
 pub struct HashCheckResponse {
     #[serde(default)]
     pub results: Vec<HashCheckResult>,
+}
+
+/// The default label: this host's name (`/proc/sys/kernel/hostname`),
+/// sanitized.
+pub fn host_label() -> Option<String> {
+    sanitize_label(&std::fs::read_to_string("/proc/sys/kernel/hostname").ok()?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn labels() {
+        assert_eq!(sanitize_label("web1.example.com").as_deref(), Some("web1.example.com"));
+        assert_eq!(sanitize_label("  -db 2\n").as_deref(), Some("db2"));
+        assert_eq!(sanitize_label("--- ..").as_deref(), None);
+        assert_eq!(sanitize_label("").as_deref(), None);
+        assert_eq!(sanitize_label(&"a".repeat(100)).map(|l| l.len()), Some(LABEL_MAX));
+    }
 }

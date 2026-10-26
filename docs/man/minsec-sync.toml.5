@@ -95,6 +95,30 @@ nftables executable used to manage crowd sets.
 The value is executed directly, not through a shell.
 Default:
 .BR nft .
+.TP
+.BI install_token " = string"
+An organization's install token, for fleet management on minsec.io.
+The host enrolls into that organization; its activity appears in the
+organization's fleet views, and its reports count once per organization, not
+once per network, toward the crowd's quorum.
+A host already enrolled anonymously enrolls again with a new key on its next
+run.
+The token is a secret: keep this file readable by root only
+.RB ( "chmod 600" ).
+Default: none.
+.TP
+.BI label " = string"
+The host's name in its organization's fleet views and alerts, sent only with
+.BR install_token :
+letters, digits,
+.BR . ,
+.B _
+and
+.BR - ,
+at most 64 characters.
+.B \(dq\(dq
+sends none.
+Default: the hostname.
 .SH REPORTING AND PRIVACY
 Reporting reads complete, newline-terminated automatic ban events beyond the
 saved inode and byte-offset cursor.
