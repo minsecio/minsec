@@ -31,5 +31,29 @@
     "body_sha256_hex": "70232068e9bb21c4b3309d8326ea635e263524d6ee5c441ebd283358f56ce0c3",
     "canonical": "minsec-report-v1\n018f3c00-0000-7000-8000-000000000002\n1893456000\n70232068e9bb21c4b3309d8326ea635e263524d6ee5c441ebd283358f56ce0c3",
     "signature_b64": "cqA80vIUXZdZh5DzLfPKnH8ieyp0gsmwaBhzlT8waLqBhY0Qejcse7WYYn76JettuQ+XZ+nzI0c8UrXecZHOAA=="
+  },
+  {
+    "name": "minsec-id-findings",
+    "purpose": "minsec-id-findings-v1",
+    "seed_hex": "4242424242424242424242424242424242424242424242424242424242424242",
+    "pubkey_b64": "IVL40Zt5HSRFMkLhXy6rbLfP+ntqXtMAl5YOBpiB2xI=",
+    "host_id": "018f3c00-0000-7000-8000-000000000003",
+    "timestamp": 1893456060,
+    "body": "{\"seq\":1893456060,\"agent_version\":\"minsec-id-sync/0.1.0\",\"os\":{\"id\":\"fedora\",\"version_id\":\"44\"},\"checks\":[\"kernel-tainted\",\"pkg-verify\"],\"counts\":[{\"check\":\"pkg-modified\",\"severity\":\"high\",\"open\":1,\"accepted\":0,\"new\":1}]}",
+    "body_sha256_hex": "fb0df778ec4a7d0d4c0eae47d910d1e3836e222f8c6c367e98c21d252768a021",
+    "canonical": "minsec-id-findings-v1\n018f3c00-0000-7000-8000-000000000003\n1893456060\nfb0df778ec4a7d0d4c0eae47d910d1e3836e222f8c6c367e98c21d252768a021",
+    "signature_b64": "ppFmojg91swmlyLiqxRP0h3nMoUch5JHPTSaxZOzhXyjj+ru17T0zg0xpvB+oeF7grxwhxZ+vPn2+BlFO5n/DQ=="
+  },
+  {
+    "name": "minsec-id-hashcheck",
+    "purpose": "minsec-id-hashcheck-v1",
+    "seed_hex": "4242424242424242424242424242424242424242424242424242424242424242",
+    "pubkey_b64": "IVL40Zt5HSRFMkLhXy6rbLfP+ntqXtMAl5YOBpiB2xI=",
+    "host_id": "018f3c00-0000-7000-8000-000000000003",
+    "timestamp": 1893456120,
+    "body": "{\"agent_version\":\"minsec-id-sync/0.1.0\",\"items\":[{\"manager\":\"rpm\",\"package\":\"logrotate-3.22.0-4.fc44.x86_64\",\"path\":\"/usr/lib/systemd/system/logrotate.timer\",\"algo\":\"sha256\",\"expected\":\"abababababababababababababababababababababababababababababababab\",\"actual\":\"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\"}]}",
+    "body_sha256_hex": "d1d8beefd6f3dda15fb910db0eea2cd15dba94fd94d1decb77024c042ef56065",
+    "canonical": "minsec-id-hashcheck-v1\n018f3c00-0000-7000-8000-000000000003\n1893456120\nd1d8beefd6f3dda15fb910db0eea2cd15dba94fd94d1decb77024c042ef56065",
+    "signature_b64": "8W9DnbJlRCPmgPHRTkxW+XhubLOeEbHqB8SDVEpZmpryL5SgytAFF2Um4bQfZBgLAFc/sQOSQohbg+0VR0+QCQ=="
   }
 ]

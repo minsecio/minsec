@@ -66,8 +66,9 @@ impl Store {
         self.dir.join("state.json")
     }
 
+    #[cfg(test)]
     pub fn key_path(&self) -> PathBuf {
-        self.dir.join("key")
+        minsec_proto::key::path(&self.dir)
     }
 
     pub fn load_state(&self) -> anyhow::Result<State> {
@@ -90,46 +91,13 @@ impl Store {
 
     /// Load the signing key, generating one on first use (file mode 0600).
     pub fn load_or_create_key(&self) -> anyhow::Result<SigningKey> {
-        match std::fs::read(self.key_path()) {
-            Ok(bytes) => {
-                let seed: [u8; 32] = bytes
-                    .as_slice()
-                    .try_into()
-                    .map_err(|_| anyhow::anyhow!("corrupt key file {}", self.key_path().display()))?;
-                Ok(SigningKey::from_bytes(&seed))
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => self.create_key(),
-            Err(e) => Err(anyhow::anyhow!("cannot read {}: {e}", self.key_path().display())),
-        }
-    }
-
-    fn create_key(&self) -> anyhow::Result<SigningKey> {
-        let mut seed = [0u8; 32];
-        getrandom::fill(&mut seed).map_err(|e| anyhow::anyhow!("cannot gather entropy: {e}"))?;
-        self.write_key_file(&seed)?;
-        Ok(SigningKey::from_bytes(&seed))
+        Ok(minsec_proto::key::load_or_create(&self.dir)?)
     }
 
     /// Replace the key (used when the server knows the key but we lost the
     /// host_id). The old key is kept aside as `key.old`.
     pub fn rotate_key(&self) -> anyhow::Result<SigningKey> {
-        let _ = std::fs::rename(self.key_path(), self.dir.join("key.old"));
-        self.create_key()
-    }
-
-    fn write_key_file(&self, seed: &[u8; 32]) -> anyhow::Result<()> {
-        use std::os::unix::fs::OpenOptionsExt;
-        let tmp = self.dir.join("key.tmp");
-        let mut f = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&tmp)?;
-        f.write_all(seed)?;
-        f.sync_all()?;
-        std::fs::rename(&tmp, self.key_path())?;
-        Ok(())
+        Ok(minsec_proto::key::rotate(&self.dir)?)
     }
 }
 

@@ -1,10 +1,11 @@
-//! The minsec multiplayer wire protocol, mirroring the backend's `pkg/wire`
+//! The minsec.io wire protocol (minsec and minsec-id), mirroring the backend's `pkg/wire`
 //! Go package. The two implementations are held together by the shared
 //! signing vectors in `testdata/vectors.json` (source of truth:
 //! `pkg/wire/testdata/vectors.json` in the minsec.io repo); any change to the
 //! canonical construction must update both repos and the vectors.
 
 pub mod feed;
+pub mod key;
 pub mod pow;
 pub mod sign;
 pub mod types;
