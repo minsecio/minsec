@@ -23,3 +23,9 @@
 #pull = true
 #ipv4 = true
 #ipv6 = true
+
+# Fleet management: an organization's install token enrolls this host into
+# its fleet on minsec.io, under a label (default: the hostname). Keep this
+# file mode 0600 when it holds a token.
+#install_token = "minsec_..."
+#label = "web1"

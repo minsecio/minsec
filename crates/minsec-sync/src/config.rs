@@ -28,6 +28,12 @@ pub struct Config {
     pub events: PathBuf,
     /// nft binary.
     pub nft: String,
+    /// An organization's install token: enrolls this host into its fleet.
+    /// Adding one to a host already enrolled anonymously re-enrolls it.
+    pub install_token: Option<String>,
+    /// The host's name in the organization's fleet views (default: the
+    /// hostname). Sent only with an install token.
+    pub label: Option<String>,
 }
 
 impl Default for Config {
@@ -42,6 +48,8 @@ impl Default for Config {
             state_dir: DEFAULT_STATE_DIR.into(),
             events: DEFAULT_EVENTS.into(),
             nft: "nft".into(),
+            install_token: None,
+            label: None,
         }
     }
 }
@@ -62,7 +70,19 @@ impl Config {
         if !cfg.server.starts_with("http://") && !cfg.server.starts_with("https://") {
             anyhow::bail!("{}: server must be an http(s) URL", path.display());
         }
+        if cfg.install_token.as_deref().is_some_and(|t| t.trim().is_empty()) {
+            anyhow::bail!("{}: install_token is empty", path.display());
+        }
         Ok(Some(cfg))
+    }
+
+    /// The host's label: the configured one, or the hostname. `label =
+    /// ""` gives none. Sent only by a host joining or in an organization.
+    pub fn label(&self) -> Option<String> {
+        match &self.label {
+            Some(l) => minsec_proto::types::sanitize_label(l),
+            None => minsec_proto::types::host_label(),
+        }
     }
 }
 
@@ -77,6 +97,16 @@ mod tests {
         assert!(!cfg.ipv6);
         assert_eq!(cfg.server, DEFAULT_SERVER);
         assert!(cfg.report && cfg.pull && cfg.ipv4);
+    }
+
+    #[test]
+    fn labels() {
+        let cfg: Config = toml::from_str("label = \"web1\"\n").unwrap();
+        assert_eq!(cfg.label().as_deref(), Some("web1"));
+        let cfg: Config = toml::from_str("install_token = \"t\"\nlabel = \"web 1\"\n").unwrap();
+        assert_eq!(cfg.label().as_deref(), Some("web1"));
+        let cfg: Config = toml::from_str("install_token = \"t\"\nlabel = \"\"\n").unwrap();
+        assert_eq!(cfg.label(), None);
     }
 
     #[test]

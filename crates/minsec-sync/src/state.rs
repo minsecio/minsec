@@ -34,6 +34,14 @@ pub struct FeedCursor {
 pub struct State {
     #[serde(default)]
     pub host_id: Option<String>,
+    /// The organization an install token enrolled this host into.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub org: Option<String>,
+    /// This enrollment was made with an install token, whether or not the
+    /// server bound it to an organization: an anonymous enrollment is
+    /// re-enrolled with a token once, never in a loop.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub token_enrolled: bool,
     /// Next report batch sequence number (see report.rs for how this
     /// interacts with wall-clock time).
     #[serde(default)]
